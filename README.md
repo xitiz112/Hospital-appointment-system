@@ -1,36 +1,232 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hospital Appointment System
 
-## Getting Started
+Next.js (App Router) backend and admin dashboard for a Nepal hospital appointment product. The React Native app is out of scope for this phase; it should consume `/api/v1` later.
 
-First, run the development server:
+Timezone: **Asia/Kathmandu**. Slot times are stored in UTC and displayed in Nepal time.
+
+## Stack
+
+- Next.js 16 App Router + TypeScript
+- Prisma 6 + PostgreSQL 16
+- Auth.js (Credentials + JWT cookies) for the admin dashboard
+- Mobile-ready JWT access/refresh tokens (`Authorization: Bearer`)
+- Zod validation, Tailwind CSS + shadcn/ui
+- eSewa v2 + Khalti sandbox via a `PaymentProvider` interface
+- Local `uploads/` with an S3-ready storage adapter
+- Optional FCM (in-app notifications always persist)
+
+## Quick start
 
 ```bash
+cp .env.example .env
+# generate secrets for AUTH_SECRET, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, CRON_SECRET
+
+npm install
+npm run db:up              # docker compose postgres (requires Docker)
+npm run prisma:migrate     # apply migrations (includes partial unique slot index)
+npm run prisma:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+If Docker is not installed, create a local Postgres database that matches `DATABASE_URL` in `.env` (default user/password/db: `hospital` / `hospital` / `hospital`), then run `prisma:migrate` and `prisma:seed`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Admin dashboard: [http://localhost:3000/login](http://localhost:3000/login)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Seed logins
 
-## Learn More
+All seeded passwords are `Password123!`
 
-To learn more about Next.js, take a look at the following resources:
+| Role    | Email                         | Notes                                      |
+|---------|-------------------------------|--------------------------------------------|
+| Admin   | `admin@hospital.local`        | Dashboard + all APIs                       |
+| Doctor  | `doctor@hospital.local`       | Dr. Hari Basnet, General Medicine          |
+| Patient | `patient@hospital.local`      | Demo patient                               |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Other doctors: `anisha.sharma@hospital.local`, `bikash.thapa@hospital.local`, `niraj.gurung@hospital.local`, `sita.adhikari@hospital.local`, `maya.rai@hospital.local` (same password).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Seeded hospital: **Kathmandu General Hospital** with six departments (Cardiology, Dermatology, Orthopedics, Pediatrics, Gynecology, General Medicine). Doctors work **Sunday–Friday** 09:00–13:00 and 14:00–17:00 (30 minute slots). Saturday is off.
 
-## Deploy on Vercel
+## npm scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Script | Purpose |
+|--------|---------|
+| `npm run dev` | Next.js dev server |
+| `npm run prisma:migrate` | `prisma migrate deploy` |
+| `npm run prisma:migrate:dev` | `prisma migrate dev` |
+| `npm run prisma:seed` / `npm run db:seed` | Seed demo data |
+| `npm run db:up` | Start Postgres via Docker Compose |
+| `npm run build` | Generate Prisma client and production build |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Auth model
+
+- **Admin web:** Auth.js Credentials provider, httpOnly JWT session cookie. Only `ADMIN` users can sign in at `/login`.
+- **Patients/doctors (and admin if needed):** `POST /api/v1/auth/login` returns `{ accessToken, refreshToken }`. Send `Authorization: Bearer <accessToken>`.
+- `getCurrentUser()` accepts **either** the Auth.js cookie **or** a Bearer token.
+
+## API conventions
+
+All `/api/v1` JSON responses:
+
+```json
+{ "success": true, "data": {}, "error": { "code": "", "message": "" }, "meta": {} }
+```
+
+Mutating routes validate with Zod. Protected routes use RBAC (`PATIENT` | `DOCTOR` | `ADMIN`). Inactive accounts receive `ACCOUNT_INACTIVE`. Concurrent double-booking hits a Postgres partial unique index and returns `409 SLOT_UNAVAILABLE`.
+
+CORS origins come from `CORS_ORIGINS` (Expo defaults included).
+
+## `/api/v1` reference
+
+### Auth
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/api/v1/auth/register` | public (creates PATIENT) |
+| POST | `/api/v1/auth/login` | public |
+| POST | `/api/v1/auth/refresh` | refresh token body |
+| POST | `/api/v1/auth/logout` | Bearer |
+| POST | `/api/v1/auth/forgot-password` | public (dev: logs reset URL) |
+| POST | `/api/v1/auth/reset-password` | public |
+| GET | `/api/v1/auth/me` | cookie or Bearer |
+
+### Profile
+| Method | Path | Auth |
+|--------|------|------|
+| GET/PATCH | `/api/v1/me` | any role |
+| POST | `/api/v1/me/photo` | multipart `file` or `photo` |
+
+### Catalog
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/v1/hospitals/current` | public |
+| GET | `/api/v1/departments` | public |
+| POST | `/api/v1/departments` | ADMIN |
+| GET/PATCH | `/api/v1/departments/:id` | GET public, PATCH ADMIN |
+| POST | `/api/v1/departments/:id/activate` | ADMIN |
+| POST | `/api/v1/departments/:id/deactivate` | ADMIN |
+| GET/POST | `/api/v1/specializations` | POST ADMIN |
+| PATCH/DELETE | `/api/v1/specializations/:id` | ADMIN |
+| GET | `/api/v1/doctors` | public search (`q`, `departmentId`, `specializationId`, `available`, `minFee`, `maxFee`, `sort=name\|fee\|fee_desc\|experience`) |
+| POST | `/api/v1/doctors` | ADMIN |
+| GET | `/api/v1/doctors/:id` | public profile |
+| PATCH | `/api/v1/doctors/:id` | ADMIN or that doctor |
+| POST | `/api/v1/doctors/:id/activate` | ADMIN |
+| POST | `/api/v1/doctors/:id/deactivate` | ADMIN |
+
+### Schedules & slots
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/v1/doctors/:id/slots?date=YYYY-MM-DD` | public |
+| GET/PUT | `/api/v1/doctors/:id/schedule` | doctor/admin (PUT replaces weekly hours + breaks) |
+| GET/POST | `/api/v1/doctors/:id/unavailability` | doctor/admin |
+| DELETE | `/api/v1/doctors/:id/unavailability/:unavailabilityId` | doctor/admin |
+
+Slots are **computed** from weekday hours minus breaks, unavailability, and occupied appointments. Clients must send a `startAt` that matches a generated free slot; the server recomputes and does not trust client `endAt`.
+
+### Appointments
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/v1/appointments` | role-scoped list |
+| POST | `/api/v1/appointments` | PATIENT `{ doctorId, startAt, notes? }` |
+| GET | `/api/v1/appointments/:id` | owner / assigned doctor / admin |
+| POST | `/api/v1/appointments/:id/cancel` | owner / doctor / admin |
+| POST | `/api/v1/appointments/:id/reschedule` | `{ startAt, reason? }` |
+| PATCH | `/api/v1/appointments/:id/status` | doctor/admin `{ status: CONFIRMED\|COMPLETED\|NO_SHOW }` |
+
+Booking: doctor must be active, slot free and not in the past. If `hospital.paymentRequired`, appointment stays `PENDING` and a payment row is created. Otherwise it is auto-`CONFIRMED`.
+
+Cancel is blocked when `now + cancellationHours >= startAt` (admin can override). Reschedule marks the old row `RESCHEDULED` (frees the unique slot) and creates a new appointment.
+
+Statuses: `PENDING` → `CONFIRMED` → `COMPLETED` | `NO_SHOW`, or `CANCELLED` / `RESCHEDULED`.
+
+### Payments
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/api/v1/payments/initiate` | `{ appointmentId, provider: ESEWA\|KHALTI }` |
+| POST | `/api/v1/payments/verify` | `{ provider, transactionUuid? \| pidx? }` |
+| GET | `/api/v1/payments` | ADMIN |
+| GET | `/api/v1/payments/:id` | owner/admin |
+| GET | `/api/v1/payments/:id/receipt` | after SUCCESS (`HAS-YYYYMMDD-#####`) |
+| POST | `/api/v1/payments/:id/cash` | ADMIN |
+| GET | `/api/v1/payments/esewa/success` | eSewa redirect |
+| GET | `/api/v1/payments/esewa/failure` | eSewa redirect |
+| GET | `/api/v1/payments/khalti/return` | Khalti redirect |
+
+Failed verify → `Payment.status = FAILED`, appointment stays `PENDING`.
+
+### Notifications & devices
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/v1/notifications` | current user (`?unread=true`) |
+| PATCH | `/api/v1/notifications/:id/read` | owner |
+| POST | `/api/v1/notifications/read-all` | owner |
+| POST | `/api/v1/devices` | `{ token, platform? }` FCM token |
+
+If `FCM_SERVER_KEY` is empty, push is skipped and in-app `Notification` rows still exist.
+
+### Dashboards
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/v1/dashboard/patient` | PATIENT |
+| GET | `/api/v1/dashboard/doctor` | DOCTOR |
+| GET | `/api/v1/dashboard/admin` | ADMIN |
+
+### Admin APIs
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/v1/admin/patients` | ADMIN |
+| PATCH | `/api/v1/admin/patients/:id/status` | `{ status: ACTIVE\|INACTIVE }` |
+| GET | `/api/v1/admin/appointments` | ADMIN |
+| GET | `/api/v1/admin/reports?days=14` | ADMIN |
+| GET/PATCH | `/api/v1/admin/settings` | hospital profile, cancellation window, payment required |
+
+### Uploads & cron
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/api/v1/uploads/:path*` | public file serve from `uploads/` |
+| GET | `/api/cron/reminders` | `Authorization: Bearer $CRON_SECRET` |
+
+## Booking example (mobile later)
+
+```bash
+# login
+curl -s http://localhost:3000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"patient@hospital.local","password":"Password123!"}'
+
+# list doctors
+curl -s 'http://localhost:3000/api/v1/doctors?departmentId=&sort=fee'
+
+# slots for a date (Nepal calendar date)
+curl -s 'http://localhost:3000/api/v1/doctors/DOCTOR_ID/slots?date=2026-09-14'
+
+# book using an available startAt from the slots payload
+curl -s http://localhost:3000/api/v1/appointments \
+  -H "Authorization: Bearer ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"doctorId":"DOCTOR_ID","startAt":"2026-09-14T03:15:00.000Z"}'
+```
+
+## Payments (sandbox)
+
+Set eSewa / Khalti keys in `.env`. Test product code `EPAYTEST` is prefilled. Khalti amounts are sent in **paisa**. Cash/pay-at-hospital is an admin action.
+
+## Double-booking protection
+
+Migration SQL:
+
+```sql
+CREATE UNIQUE INDEX appointment_active_slot_unique
+ON "Appointment" ("doctorId", "startAt")
+WHERE status NOT IN ('CANCELLED', 'RESCHEDULED');
+```
+
+Book and reschedule run in `prisma.$transaction`.
+
+## Known gaps (intentionally out of scope)
+
+- React Native / Expo client
+- Production SMTP (reset links are logged in development)
+- Real S3 wiring (adapter interface is ready)
+- Live FCM unless `FCM_SERVER_KEY` is set
+- Telemedicine, EMR, pharmacy/lab, AI
+- Multi-hospital UI (schema already has `Hospital`)
