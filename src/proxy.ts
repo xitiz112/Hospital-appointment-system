@@ -1,5 +1,6 @@
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { authConfig } from "@/auth.config";
 
 const ADMIN_PREFIXES = [
   "/dashboard",
@@ -13,7 +14,9 @@ const ADMIN_PREFIXES = [
   "/schedules",
 ];
 
-export default auth((req) => {
+const { auth } = NextAuth(authConfig);
+
+export const proxy = auth((req) => {
   const { pathname } = req.nextUrl;
   const isAdminPath = ADMIN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (isAdminPath) {
@@ -24,7 +27,10 @@ export default auth((req) => {
       return NextResponse.redirect(login);
     }
   }
+  return NextResponse.next();
 });
+
+export default proxy;
 
 export const config = {
   matcher: [
