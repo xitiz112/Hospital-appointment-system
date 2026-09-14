@@ -14,6 +14,7 @@ export function SettingsForm(props: {
   cancellationHours: number;
   paymentRequired: boolean;
   defaultAppointmentDurationMin: number;
+  timezone: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -34,6 +35,7 @@ export function SettingsForm(props: {
         cancellationHours: Number(form.get("cancellationHours")),
         paymentRequired: form.get("paymentRequired") === "on",
         defaultAppointmentDurationMin: Number(form.get("defaultAppointmentDurationMin")),
+        timezone: form.get("timezone"),
       }),
     });
     const json = await res.json();
@@ -61,6 +63,10 @@ export function SettingsForm(props: {
         <Input name="address" defaultValue={props.address} />
       </div>
       <div className="space-y-1">
+        <Label>Timezone</Label>
+        <Input name="timezone" defaultValue={props.timezone} />
+      </div>
+      <div className="space-y-1">
         <Label>Cancellation window (hours)</Label>
         <Input name="cancellationHours" type="number" defaultValue={props.cancellationHours} />
       </div>
@@ -72,9 +78,20 @@ export function SettingsForm(props: {
           defaultValue={props.defaultAppointmentDurationMin}
         />
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="paymentRequired" defaultChecked={props.paymentRequired} />
-        Payment required before confirmation
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="paymentRequired"
+          defaultChecked={props.paymentRequired}
+          className="mt-0.5"
+        />
+        <span>
+          Require successful payment before confirmation
+          <span className="mt-1 block text-xs text-muted-foreground">
+            When on, bookings with a consultation fee stay Pending until eSewa, Khalti, or cash
+            succeeds. Staff cannot confirm unpaid visits.
+          </span>
+        </span>
       </label>
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
       <Button type="submit" disabled={pending}>

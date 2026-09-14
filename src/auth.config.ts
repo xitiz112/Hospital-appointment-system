@@ -1,3 +1,4 @@
+import "@/lib/auth-env";
 import type { NextAuthConfig } from "next-auth";
 
 /**

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,7 +28,9 @@ export default async function PaymentsPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Payments</h1>
-        <p className="text-sm text-muted-foreground">eSewa, Khalti, and cash receipts</p>
+        <p className="text-sm text-muted-foreground">
+          Successful eSewa, Khalti, or cash payment confirms the linked appointment
+        </p>
       </div>
       {q.esewa || q.khalti ? (
         <p className="text-sm">
@@ -58,7 +61,17 @@ export default async function PaymentsPage({
               <TableCell>
                 <Badge variant={statusVariant(p.status)}>{p.status}</Badge>
               </TableCell>
-              <TableCell>{p.receiptNumber ?? "—"}</TableCell>
+              <TableCell>
+                {p.receiptNumber ? (
+                  <Link href={`/payments/${p.id}`} className="text-primary hover:underline">
+                    {p.receiptNumber}
+                  </Link>
+                ) : (
+                  <Link href={`/payments/${p.id}`} className="text-muted-foreground hover:underline">
+                    View
+                  </Link>
+                )}
+              </TableCell>
               <TableCell>
                 <CashPayButton id={p.id} payable={p.status !== "SUCCESS"} />
               </TableCell>

@@ -17,16 +17,47 @@ function isUniqueConflict(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
+export function requiresSuccessfulPayment(
+  paymentRequired: boolean,
+  consultationFee: Prisma.Decimal | number | string,
+) {
+  return paymentRequired && Number(consultationFee) > 0;
+}
+
+export function hasSuccessfulPayment(payments: { status: PaymentStatus }[]) {
+  return payments.some((p) => p.status === PaymentStatus.SUCCESS);
+}
+
 export async function getHospital() {
   const hospital = await prisma.hospital.findFirst();
   if (!hospital) throw new ApiError("HOSPITAL_NOT_FOUND", "Hospital is not configured", 500);
   return hospital;
 }
 
-export async function bookAppointment(user: CurrentUser, input: { doctorId: string; startAt: Date; notes?: string }) {
-  if (user.role !== Role.PATIENT || !user.patient) {
-    throw new ApiError("FORBIDDEN", "Only patients can book appointments", 403);
+export async function bookAppointment(
+  user: CurrentUser,
+  input: { doctorId: string; startAt: Date; notes?: string; patientId?: string },
+) {
+  let patientId: string;
+  if (user.role === Role.ADMIN) {
+    if (!input.patientId) {
+      throw new ApiError("VALIDATION_ERROR", "patientId is required when staff book an appointment", 400);
+    }
+    patientId = input.patientId;
+  } else if (user.role === Role.PATIENT && user.patient) {
+    patientId = user.patient.id;
+  } else {
+    throw new ApiError("FORBIDDEN", "Only patients or admins can book appointments", 403);
   }
+
+  const patient = await prisma.patient.findUnique({
+    where: { id: patientId },
+    include: { user: true },
+  });
+  if (!patient || patient.user.status !== "ACTIVE") {
+    throw new ApiError("PATIENT_UNAVAILABLE", "Patient account is not available", 400);
+  }
+
   const hospital = await getHospital();
   const doctor = await prisma.doctor.findUnique({
     where: { id: input.doctorId },
@@ -41,17 +72,17 @@ export async function bookAppointment(user: CurrentUser, input: { doctorId: stri
     throw new ApiError("SLOT_UNAVAILABLE", "That slot is not available", 409);
   }
 
-  const paymentRequired = hospital.paymentRequired;
+  const needsPayment = requiresSuccessfulPayment(hospital.paymentRequired, doctor.consultationFee);
   try {
     const result = await prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.create({
         data: {
           hospitalId: hospital.id,
-          patientId: user.patient!.id,
+          patientId,
           doctorId: doctor.id,
           startAt: check.slot!.startAt,
           endAt: check.slot!.endAt,
-          status: paymentRequired ? AppointmentStatus.PENDING : AppointmentStatus.CONFIRMED,
+          status: needsPayment ? AppointmentStatus.PENDING : AppointmentStatus.CONFIRMED,
           notes: input.notes,
         },
         include: {
@@ -62,7 +93,7 @@ export async function bookAppointment(user: CurrentUser, input: { doctorId: stri
       });
 
       let payment = null;
-      if (paymentRequired) {
+      if (needsPayment) {
         payment = await tx.payment.create({
           data: {
             appointmentId: appointment.id,
@@ -86,9 +117,9 @@ export async function bookAppointment(user: CurrentUser, input: { doctorId: stri
     });
 
     await notifyUser({
-      userId: user.id,
-      type: paymentRequired ? "APPOINTMENT_BOOKED" : "APPOINTMENT_CONFIRMED",
-      title: paymentRequired ? "Appointment pending payment" : "Appointment confirmed",
+      userId: patient.userId,
+      type: needsPayment ? "APPOINTMENT_BOOKED" : "APPOINTMENT_CONFIRMED",
+      title: needsPayment ? "Appointment pending payment" : "Appointment confirmed",
       body: `Your visit with ${doctor.user.name} is scheduled.`,
       data: { appointmentId: result.appointment.id },
     });
@@ -96,14 +127,14 @@ export async function bookAppointment(user: CurrentUser, input: { doctorId: stri
       userId: doctor.userId,
       type: "APPOINTMENT_BOOKED",
       title: "New appointment",
-      body: `${user.name} booked a slot.`,
+      body: `${patient.user.name} booked a slot.`,
       data: { appointmentId: result.appointment.id },
     });
 
     return {
       ...result,
-      paymentRequired,
-      needsPayment: paymentRequired,
+      paymentRequired: hospital.paymentRequired,
+      needsPayment,
     };
   } catch (error) {
     if (isUniqueConflict(error)) {
@@ -232,9 +263,10 @@ export async function rescheduleAppointment(
     throw new ApiError("SLOT_UNAVAILABLE", "That slot is not available", 409);
   }
 
-  const paid = appointment.payments.some((p) => p.status === PaymentStatus.SUCCESS);
-  const newStatus =
-    hospital.paymentRequired && !paid ? AppointmentStatus.PENDING : AppointmentStatus.CONFIRMED;
+  const paid = hasSuccessfulPayment(appointment.payments);
+  const needsPayment =
+    requiresSuccessfulPayment(hospital.paymentRequired, appointment.doctor.consultationFee) && !paid;
+  const newStatus = needsPayment ? AppointmentStatus.PENDING : AppointmentStatus.CONFIRMED;
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -257,6 +289,23 @@ export async function rescheduleAppointment(
           patient: { include: { user: true } },
         },
       });
+      if (needsPayment) {
+        const moved = await tx.payment.updateMany({
+          where: { appointmentId: appointment.id, status: { not: PaymentStatus.SUCCESS } },
+          data: { appointmentId: next.id },
+        });
+        if (moved.count === 0) {
+          await tx.payment.create({
+            data: {
+              appointmentId: next.id,
+              amount: appointment.doctor.consultationFee,
+              currency: "NPR",
+              provider: PaymentProviderType.CASH,
+              status: PaymentStatus.PENDING,
+            },
+          });
+        }
+      }
       await tx.appointmentReschedule.create({
         data: {
           fromAppointmentId: appointment.id,
@@ -313,7 +362,10 @@ export async function updateAppointmentStatus(
   if (user.role !== Role.ADMIN && user.role !== Role.DOCTOR) {
     throw new ApiError("FORBIDDEN", "Only doctors or admins can update status", 403);
   }
-  const appointment = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+  const appointment = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    include: { payments: true, doctor: true },
+  });
   if (!appointment) throw new ApiError("NOT_FOUND", "Appointment not found", 404);
   if (user.role === Role.DOCTOR && user.doctor?.id !== appointment.doctorId) {
     throw new ApiError("FORBIDDEN", "You can only update your own appointments", 403);
@@ -321,6 +373,19 @@ export async function updateAppointmentStatus(
   const allowed = allowedTransitions[appointment.status] ?? [];
   if (!allowed.includes(status)) {
     throw new ApiError("INVALID_STATUS", `Cannot change ${appointment.status} to ${status}`, 400);
+  }
+  if (status === AppointmentStatus.CONFIRMED) {
+    const hospital = await getHospital();
+    const unpaid =
+      requiresSuccessfulPayment(hospital.paymentRequired, appointment.doctor.consultationFee) &&
+      !hasSuccessfulPayment(appointment.payments);
+    if (unpaid) {
+      throw new ApiError(
+        "PAYMENT_REQUIRED",
+        "Appointment can be confirmed only after payment succeeds",
+        400,
+      );
+    }
   }
   const updated = await prisma.appointment.update({
     where: { id: appointmentId },

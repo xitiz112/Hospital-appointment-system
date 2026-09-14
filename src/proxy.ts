@@ -1,3 +1,4 @@
+import "@/lib/auth-env";
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
@@ -5,6 +6,7 @@ import { authConfig } from "@/auth.config";
 const ADMIN_PREFIXES = [
   "/dashboard",
   "/departments",
+  "/specializations",
   "/doctors",
   "/patients",
   "/appointments",
@@ -12,6 +14,7 @@ const ADMIN_PREFIXES = [
   "/reports",
   "/settings",
   "/schedules",
+  "/users",
 ];
 
 const { auth } = NextAuth(authConfig);
@@ -34,14 +37,27 @@ export default proxy;
 
 export const config = {
   matcher: [
+    "/dashboard",
     "/dashboard/:path*",
+    "/departments",
     "/departments/:path*",
+    "/doctors",
     "/doctors/:path*",
+    "/patients",
     "/patients/:path*",
+    "/appointments",
     "/appointments/:path*",
+    "/payments",
     "/payments/:path*",
+    "/reports",
     "/reports/:path*",
+    "/settings",
     "/settings/:path*",
+    "/schedules",
     "/schedules/:path*",
+    "/specializations",
+    "/specializations/:path*",
+    "/users",
+    "/users/:path*",
   ],
 };

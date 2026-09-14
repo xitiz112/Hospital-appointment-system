@@ -12,7 +12,7 @@ export function CashPayButton({ id, payable }: { id: string; payable: boolean })
   }
   return (
     <Button size="sm" onClick={run}>
-      Mark cash paid
+      Mark cash paid (confirms visit)
     </Button>
   );
 }

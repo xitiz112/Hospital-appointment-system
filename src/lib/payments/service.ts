@@ -89,23 +89,44 @@ export async function initiatePayment(
 }
 
 async function markPaid(paymentId: string, gatewayTxnId?: string) {
-  const receiptNumber = await nextReceiptNumber();
-  const payment = await prisma.payment.update({
+  const current = await prisma.payment.findUnique({
     where: { id: paymentId },
-    data: {
-      status: PaymentStatus.SUCCESS,
-      gatewayTxnId: gatewayTxnId ?? null,
-      receiptNumber,
-      paidAt: new Date(),
-    },
-    include: {
-      appointment: { include: { patient: true, doctor: true } },
-    },
+    include: { appointment: { include: { patient: true, doctor: true } } },
   });
-  await prisma.appointment.update({
-    where: { id: payment.appointmentId },
-    data: { status: AppointmentStatus.CONFIRMED },
+  if (!current) throw new ApiError("NOT_FOUND", "Payment not found", 404);
+  if (current.status === PaymentStatus.SUCCESS) return current;
+
+  const blocked: AppointmentStatus[] = [
+    AppointmentStatus.CANCELLED,
+    AppointmentStatus.RESCHEDULED,
+    AppointmentStatus.COMPLETED,
+    AppointmentStatus.NO_SHOW,
+  ];
+  if (blocked.includes(current.appointment.status)) {
+    throw new ApiError("INVALID_STATUS", "Cannot record payment for this appointment", 400);
+  }
+
+  const receiptNumber = await nextReceiptNumber();
+  const payment = await prisma.$transaction(async (tx) => {
+    const updated = await tx.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: PaymentStatus.SUCCESS,
+        gatewayTxnId: gatewayTxnId ?? null,
+        receiptNumber,
+        paidAt: new Date(),
+      },
+      include: {
+        appointment: { include: { patient: true, doctor: true } },
+      },
+    });
+    await tx.appointment.update({
+      where: { id: updated.appointmentId },
+      data: { status: AppointmentStatus.CONFIRMED },
+    });
+    return updated;
   });
+
   await notifyUser({
     userId: payment.appointment.patient.userId,
     type: "PAYMENT_SUCCESS",
@@ -118,6 +139,13 @@ async function markPaid(paymentId: string, gatewayTxnId?: string) {
     type: "APPOINTMENT_CONFIRMED",
     title: "Appointment confirmed",
     body: "Payment succeeded and your appointment is confirmed.",
+    data: { appointmentId: payment.appointmentId },
+  });
+  await notifyUser({
+    userId: payment.appointment.doctor.userId,
+    type: "APPOINTMENT_CONFIRMED",
+    title: "Appointment confirmed",
+    body: "Payment succeeded and the appointment is confirmed.",
     data: { appointmentId: payment.appointmentId },
   });
   return payment;

@@ -39,6 +39,7 @@ export const POST = apiHandler(async ({ req, user }) => {
     doctorId: body.doctorId,
     startAt: new Date(body.startAt),
     notes: body.notes,
+    patientId: body.patientId,
   });
   return jsonOk(result, undefined, 201);
-}, { auth: true, roles: [Role.PATIENT] });
+}, { auth: true, roles: [Role.PATIENT, Role.ADMIN] });

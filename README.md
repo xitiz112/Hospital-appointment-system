@@ -63,6 +63,16 @@ Seeded hospital: **Kathmandu General Hospital** with six departments (Cardiology
 - **Patients/doctors (and admin if needed):** `POST /api/v1/auth/login` returns `{ accessToken, refreshToken }`. Send `Authorization: Bearer <accessToken>`.
 - `getCurrentUser()` accepts **either** the Auth.js cookie **or** a Bearer token.
 
+### Vercel production
+
+Set these on the project (Settings → Environment Variables). Redeploy after changing them.
+
+| Variable | Production value |
+|----------|------------------|
+| `DATABASE_URL` | Prisma Postgres URL (name must be `DATABASE_URL`, not `DB_DATABASE_URL`) |
+| `AUTH_SECRET` | `openssl rand -base64 32` (required; do not leave the example placeholder) |
+| `AUTH_URL` | **Unset**, or `https://your-app.vercel.app` — never `http://localhost:3000` |
+
 ## API conventions
 
 All `/api/v1` JSON responses:
@@ -130,13 +140,13 @@ Slots are **computed** from weekday hours minus breaks, unavailability, and occu
 | GET | `/api/v1/appointments/:id` | owner / assigned doctor / admin |
 | POST | `/api/v1/appointments/:id/cancel` | owner / doctor / admin |
 | POST | `/api/v1/appointments/:id/reschedule` | `{ startAt, reason? }` |
-| PATCH | `/api/v1/appointments/:id/status` | doctor/admin `{ status: CONFIRMED\|COMPLETED\|NO_SHOW }` |
+| PATCH | `/api/v1/appointments/:id/status` | doctor/admin `{ status: CONFIRMED\|COMPLETED\|NO_SHOW }` — `CONFIRMED` is rejected while payment is still required and unpaid |
 
-Booking: doctor must be active, slot free and not in the past. If `hospital.paymentRequired`, appointment stays `PENDING` and a payment row is created. Otherwise it is auto-`CONFIRMED`.
+Booking: doctor must be active, slot free and not in the past. If `hospital.paymentRequired` and the doctor’s consultation fee is greater than 0, the appointment stays `PENDING` until a linked payment is `SUCCESS` (eSewa/Khalti verify or admin cash). Staff cannot PATCH `PENDING` → `CONFIRMED` while unpaid. If payment is not required (or the fee is 0), the booking is auto-`CONFIRMED`.
 
-Cancel is blocked when `now + cancellationHours >= startAt` (admin can override). Reschedule marks the old row `RESCHEDULED` (frees the unique slot) and creates a new appointment.
+Cancel is blocked when `now + cancellationHours >= startAt` (admin can override). Reschedule marks the old row `RESCHEDULED` (frees the unique slot) and creates a new appointment. An unpaid reschedule stays `PENDING`; a visit that already has a `SUCCESS` payment is created as `CONFIRMED`.
 
-Statuses: `PENDING` → `CONFIRMED` → `COMPLETED` | `NO_SHOW`, or `CANCELLED` / `RESCHEDULED`.
+Statuses: `PENDING` (awaiting payment when required) → `CONFIRMED` (after payment success, or immediately when payment is not required) → `COMPLETED` | `NO_SHOW`, or `CANCELLED` / `RESCHEDULED`.
 
 ### Payments
 | Method | Path | Auth |
@@ -151,7 +161,7 @@ Statuses: `PENDING` → `CONFIRMED` → `COMPLETED` | `NO_SHOW`, or `CANCELLED` 
 | GET | `/api/v1/payments/esewa/failure` | eSewa redirect |
 | GET | `/api/v1/payments/khalti/return` | Khalti redirect |
 
-Failed verify → `Payment.status = FAILED`, appointment stays `PENDING`.
+Successful verify or cash mark-paid → `Payment.status = SUCCESS` and the appointment becomes `CONFIRMED` (notifications sent). Failed verify → `Payment.status = FAILED`, appointment stays `PENDING`.
 
 ### Notifications & devices
 | Method | Path | Auth |

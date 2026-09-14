@@ -98,6 +98,7 @@ export const bookAppointmentSchema = z.object({
   doctorId: z.string().min(1),
   startAt: z.string(),
   notes: z.string().optional(),
+  patientId: z.string().optional(),
 });
 
 export const cancelAppointmentSchema = z.object({
@@ -136,6 +137,7 @@ export const settingsSchema = z.object({
   email: z.email().optional().nullable(),
   phone: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
+  timezone: z.string().optional(),
   cancellationHours: z.number().int().min(0).max(168).optional(),
   paymentRequired: z.boolean().optional(),
   defaultAppointmentDurationMin: z.number().int().min(5).max(240).optional(),
@@ -143,4 +145,38 @@ export const settingsSchema = z.object({
 
 export const patientStatusSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]),
+});
+
+export const adminPatientCreateSchema = z.object({
+  name: z.string().trim().min(2),
+  email: z.email(),
+  phone: z.string().trim().min(7).max(20).optional(),
+  password: z.string().min(8).optional(),
+  dateOfBirth: z.string().optional().nullable(),
+  gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional().nullable(),
+  address: z.string().optional().nullable(),
+});
+
+export const adminPatientUpdateSchema = z.object({
+  name: z.string().trim().min(2).optional(),
+  phone: z.string().trim().min(7).max(20).optional().nullable(),
+  dateOfBirth: z.string().optional().nullable(),
+  gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional().nullable(),
+  address: z.string().optional().nullable(),
+  notifyEmail: z.boolean().optional(),
+  notifyPush: z.boolean().optional(),
+  notifySms: z.boolean().optional(),
+});
+
+export const adminUserCreateSchema = z.object({
+  name: z.string().trim().min(2),
+  email: z.email(),
+  phone: z.string().trim().min(7).max(20).optional(),
+  password: z.string().min(8),
+  role: z.enum(["ADMIN"]),
+});
+
+export const adminUserPatchSchema = z.object({
+  status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+  name: z.string().trim().min(2).optional(),
 });

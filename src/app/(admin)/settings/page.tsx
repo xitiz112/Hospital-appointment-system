@@ -20,6 +20,7 @@ export default async function SettingsPage() {
         cancellationHours={hospital.cancellationHours}
         paymentRequired={hospital.paymentRequired}
         defaultAppointmentDurationMin={hospital.defaultAppointmentDurationMin}
+        timezone={hospital.timezone}
       />
     </div>
   );
