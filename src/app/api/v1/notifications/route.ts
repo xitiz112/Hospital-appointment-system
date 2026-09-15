@@ -18,3 +18,5 @@ export const GET = apiHandler(async ({ req, user }) => {
   });
   return jsonOk(items, { unreadCount });
 }, { auth: true });
+
+export const OPTIONS = GET;

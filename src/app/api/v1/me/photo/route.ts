@@ -13,3 +13,5 @@ export const POST = apiHandler(async ({ req, user }) => {
   await prisma.user.update({ where: { id: user.id }, data: { imageUrl } });
   return jsonOk({ imageUrl });
 }, { auth: true });
+
+export const OPTIONS = POST;

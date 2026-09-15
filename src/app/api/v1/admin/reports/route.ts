@@ -47,3 +47,5 @@ export const GET = apiHandler(async ({ req }) => {
     totalRevenue: payments.reduce((s, p) => s + Number(p.amount), 0),
   });
 }, { auth: true, roles: [Role.ADMIN] });
+
+export const OPTIONS = GET;

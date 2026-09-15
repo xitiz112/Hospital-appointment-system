@@ -18,3 +18,5 @@ export const PATCH = apiHandler(async ({ req, params, user }) => {
   });
   return jsonOk({ id: params.id, status: body.status });
 }, { auth: true, roles: [Role.ADMIN] });
+
+export const OPTIONS = PATCH;

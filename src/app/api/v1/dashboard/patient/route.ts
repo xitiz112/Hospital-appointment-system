@@ -26,3 +26,5 @@ export const GET = apiHandler(async ({ user }) => {
   ]);
   return jsonOk({ upcoming, past, unreadNotifications: unread });
 }, { auth: true, roles: [Role.PATIENT] });
+
+export const OPTIONS = GET;

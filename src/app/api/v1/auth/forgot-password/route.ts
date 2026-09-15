@@ -22,3 +22,5 @@ export const POST = apiHandler(async ({ req }) => {
     message: "If that email exists, a reset link was created. In development it is logged to the server console.",
   });
 });
+
+export const OPTIONS = POST;

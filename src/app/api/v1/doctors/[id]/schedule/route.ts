@@ -64,3 +64,5 @@ export const PUT = apiHandler(async ({ req, params, user }) => {
   });
   return jsonOk(fresh);
 }, { auth: true, roles: [Role.ADMIN, Role.DOCTOR] });
+
+export const OPTIONS = PUT;

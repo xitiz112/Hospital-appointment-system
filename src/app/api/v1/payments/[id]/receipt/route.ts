@@ -39,3 +39,5 @@ export const GET = apiHandler(async ({ params, user }) => {
     appointmentStart: payment.appointment.startAt,
   });
 }, { auth: true });
+
+export const OPTIONS = GET;

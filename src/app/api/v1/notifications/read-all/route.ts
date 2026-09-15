@@ -8,3 +8,5 @@ export const POST = apiHandler(async ({ user }) => {
   });
   return jsonOk({ read: true });
 }, { auth: true });
+
+export const OPTIONS = POST;

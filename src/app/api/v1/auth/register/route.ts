@@ -46,3 +46,5 @@ export const POST = apiHandler(async ({ req }) => {
   const tokens = await issueTokenPair(user);
   return jsonOk({ user: publicUser(user), ...tokens }, undefined, 201);
 });
+
+export const OPTIONS = POST;

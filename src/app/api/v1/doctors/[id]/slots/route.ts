@@ -17,3 +17,5 @@ export const GET = apiHandler(async ({ req, params }) => {
     })),
   );
 });
+
+export const OPTIONS = GET;

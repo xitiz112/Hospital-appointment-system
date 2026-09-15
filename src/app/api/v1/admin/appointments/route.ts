@@ -17,3 +17,5 @@ export const GET = apiHandler(async ({ req }) => {
   });
   return jsonOk(items);
 }, { auth: true, roles: [Role.ADMIN] });
+
+export const OPTIONS = GET;

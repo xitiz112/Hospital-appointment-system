@@ -53,3 +53,5 @@ export const GET = apiHandler(async () => {
     pendingPayments,
   });
 }, { auth: true, roles: [Role.ADMIN] });
+
+export const OPTIONS = GET;

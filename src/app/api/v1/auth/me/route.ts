@@ -5,3 +5,5 @@ export const GET = apiHandler(async ({ user }) => {
   if (!user) throw new ApiError("UNAUTHORIZED", "Authentication required", 401);
   return jsonOk(publicUser(user));
 }, { auth: true });
+
+export const OPTIONS = GET;

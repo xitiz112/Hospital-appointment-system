@@ -13,3 +13,5 @@ export const POST = apiHandler(async ({ req }) => {
   });
   return jsonOk({ loggedOut: true });
 }, { auth: true });
+
+export const OPTIONS = POST;

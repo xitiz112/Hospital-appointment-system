@@ -57,3 +57,5 @@ export const PATCH = apiHandler(async ({ req, user }) => {
   });
   return jsonOk(publicUser(fresh));
 }, { auth: true });
+
+export const OPTIONS = PATCH;

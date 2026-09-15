@@ -28,3 +28,5 @@ export const POST = apiHandler(async ({ req }) => {
   ]);
   return jsonOk({ reset: true });
 });
+
+export const OPTIONS = POST;

@@ -25,3 +25,5 @@ export const GET = apiHandler(async ({ params, user }) => {
   }
   return jsonOk(payment);
 }, { auth: true });
+
+export const OPTIONS = GET;

@@ -40,3 +40,5 @@ export const POST = apiHandler(async ({ req }) => {
     expiresIn: 15 * 60,
   });
 });
+
+export const OPTIONS = POST;

@@ -13,3 +13,5 @@ export const DELETE = apiHandler(async ({ params }) => {
   await prisma.specialization.delete({ where: { id: params.id } });
   return jsonOk({ deleted: true });
 }, { auth: true, roles: [Role.ADMIN] });
+
+export const OPTIONS = PATCH;

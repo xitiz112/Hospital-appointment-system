@@ -17,3 +17,5 @@ export const GET = apiHandler(async ({ params, user }) => {
   if (!appointment) throw new ApiError("NOT_FOUND", "Appointment not found", 404);
   return jsonOk(appointment);
 }, { auth: true });
+
+export const OPTIONS = GET;

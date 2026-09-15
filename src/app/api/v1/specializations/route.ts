@@ -16,3 +16,5 @@ export const POST = apiHandler(async ({ req }) => {
   const item = await prisma.specialization.create({ data: body });
   return jsonOk(item, undefined, 201);
 }, { auth: true, roles: [Role.ADMIN] });
+
+export const OPTIONS = POST;

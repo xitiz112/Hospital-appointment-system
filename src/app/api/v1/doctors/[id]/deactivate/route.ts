@@ -24,3 +24,5 @@ export const POST = apiHandler(async ({ params, user }) => {
   const fresh = await prisma.doctor.findUnique({ where: { id: doctor.id }, select: doctorPublicSelect });
   return jsonOk(fresh);
 }, { auth: true, roles: [Role.ADMIN] });
+
+export const OPTIONS = POST;

@@ -35,3 +35,5 @@ export const POST = apiHandler(async ({ req, params, user }) => {
   }
   return jsonOk(item, undefined, 201);
 }, { auth: true, roles: [Role.ADMIN, Role.DOCTOR] });
+
+export const OPTIONS = POST;

@@ -11,3 +11,5 @@ export const DELETE = apiHandler(async ({ params, user }) => {
   await prisma.doctorUnavailability.delete({ where: { id: item.id } });
   return jsonOk({ deleted: true });
 }, { auth: true, roles: [Role.ADMIN, Role.DOCTOR] });
+
+export const OPTIONS = DELETE;

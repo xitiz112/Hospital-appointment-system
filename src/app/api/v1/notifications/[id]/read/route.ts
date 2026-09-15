@@ -13,3 +13,5 @@ export const PATCH = apiHandler(async ({ params, user }) => {
   });
   return jsonOk(updated);
 }, { auth: true });
+
+export const OPTIONS = PATCH;

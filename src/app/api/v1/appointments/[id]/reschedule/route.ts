@@ -7,3 +7,5 @@ export const POST = apiHandler(async ({ req, params, user }) => {
   const appointment = await rescheduleAppointment(user!, params.id, new Date(body.startAt), body.reason);
   return jsonOk(appointment);
 }, { auth: true });
+
+export const OPTIONS = POST;

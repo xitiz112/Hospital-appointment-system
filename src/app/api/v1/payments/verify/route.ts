@@ -7,3 +7,5 @@ export const POST = apiHandler(async ({ req }) => {
   const result = await verifyPayment(body);
   return jsonOk(result);
 });
+
+export const OPTIONS = POST;

@@ -6,3 +6,5 @@ export const GET = apiHandler(async () => {
   if (!hospital) throw new ApiError("HOSPITAL_NOT_FOUND", "Hospital is not configured", 404);
   return jsonOk(hospital);
 });
+
+export const OPTIONS = GET;
