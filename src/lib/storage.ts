@@ -1,7 +1,7 @@
 import { mkdir, writeFile, unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
-import { BlobError, del, get, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 import { ApiError } from "@/lib/errors";
 
 export interface StorageAdapter {
@@ -64,42 +64,25 @@ function safeFolderName(folder: string) {
   return folder.replace(/[^a-z0-9_-]/gi, "") || "profiles";
 }
 
-function blobAccess(): "public" | "private" {
-  return process.env.BLOB_ACCESS === "private" ? "private" : "public";
-}
-
-function mapBlobError(error: unknown): never {
-  if (error instanceof ApiError) throw error;
-  const message = error instanceof Error ? error.message : "Blob upload failed";
-  if (/private store/i.test(message) || /public access on a private/i.test(message)) {
-    throw new ApiError(
-      "STORAGE_ACCESS_MISMATCH",
-      "Your Vercel Blob store is Private, but uploads need Public access (or set BLOB_ACCESS=private). Create a new Blob store with Access = Public, reconnect it, and redeploy.",
-      502,
-    );
-  }
-  if (/public store/i.test(message) || /private access on a public/i.test(message)) {
-    throw new ApiError(
-      "STORAGE_ACCESS_MISMATCH",
-      "Your Vercel Blob store is Public. Remove BLOB_ACCESS=private, or create a Private store.",
-      502,
-    );
-  }
-  if (error instanceof BlobError) {
-    throw new ApiError("STORAGE_ERROR", message, 502);
-  }
-  throw new ApiError("STORAGE_ERROR", message || "Blob upload failed", 502);
-}
-
-function isPrivateStoreMismatch(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  return /private store/i.test(message) || /public access on a private/i.test(message);
+function blobAccessOrder(): Array<"public" | "private"> {
+  const forced = process.env.BLOB_ACCESS?.trim().toLowerCase();
+  if (forced === "public") return ["public", "private"];
+  if (forced === "private") return ["private", "public"];
+  // New Vercel Blob stores default to Private; try private first.
+  return ["private", "public"];
 }
 
 export class LocalStorageAdapter implements StorageAdapter {
   constructor(private root = process.env.UPLOAD_DIR ?? "uploads") {}
 
   async save(buffer: Buffer, _filename: string, mime: string, folder = "profiles") {
+    if (process.env.VERCEL) {
+      throw new ApiError(
+        "STORAGE_NOT_CONFIGURED",
+        "BLOB_READ_WRITE_TOKEN is missing on Vercel. Connect a Blob store to this project (Storage tab) so the token is added, then redeploy.",
+        501,
+      );
+    }
     assertImage(buffer, mime);
     const safeFolder = safeFolderName(folder);
     const safe = `${Date.now()}-${randomUUID()}.${imageExt(mime)}`;
@@ -137,6 +120,7 @@ export class VercelBlobStorageAdapter implements StorageAdapter {
       access,
       contentType: mime,
       addRandomSuffix: false,
+      allowOverwrite: true,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
     // Private blobs are not anonymous-readable; serve through our proxy.
@@ -152,20 +136,21 @@ export class VercelBlobStorageAdapter implements StorageAdapter {
       throw new ApiError("STORAGE_NOT_CONFIGURED", "BLOB_READ_WRITE_TOKEN is not set", 501);
     }
 
-    const preferred = blobAccess();
-    try {
-      return await this.putOnce(buffer, mime, folder, preferred);
-    } catch (error) {
-      // Common case: store created as Private (Vercel default) while code uses public.
-      if (preferred === "public" && isPrivateStoreMismatch(error)) {
-        try {
-          return await this.putOnce(buffer, mime, folder, "private");
-        } catch (retryError) {
-          mapBlobError(retryError);
-        }
+    // SDK often hides "private store" as a generic service error — try both modes.
+    const errors: string[] = [];
+    for (const access of blobAccessOrder()) {
+      try {
+        return await this.putOnce(buffer, mime, folder, access);
+      } catch (error) {
+        const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        errors.push(`${access} → ${msg}`);
       }
-      mapBlobError(error);
     }
+    throw new ApiError(
+      "STORAGE_ERROR",
+      `Blob upload failed for both access modes. ${errors.join(" | ")}`,
+      502,
+    );
   }
 
   async delete(storedPath: string) {
