@@ -1,6 +1,7 @@
 import { mkdir, writeFile, unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import { del, put } from "@vercel/blob";
 import { ApiError } from "@/lib/errors";
 
 export interface StorageAdapter {
@@ -11,19 +12,30 @@ export interface StorageAdapter {
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 2 * 1024 * 1024);
 
+function assertImage(buffer: Buffer, mime: string) {
+  if (!ALLOWED_TYPES.has(mime)) {
+    throw new ApiError("INVALID_FILE_TYPE", "Only JPEG, PNG, and WebP images are allowed", 400);
+  }
+  if (buffer.byteLength > MAX_BYTES) {
+    throw new ApiError("FILE_TOO_LARGE", "Image must be 2MB or smaller", 400);
+  }
+}
+
+function imageExt(mime: string) {
+  return mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
+}
+
+function safeFolderName(folder: string) {
+  return folder.replace(/[^a-z0-9_-]/gi, "") || "profiles";
+}
+
 export class LocalStorageAdapter implements StorageAdapter {
   constructor(private root = process.env.UPLOAD_DIR ?? "uploads") {}
 
   async save(buffer: Buffer, _filename: string, mime: string, folder = "profiles") {
-    if (!ALLOWED_TYPES.has(mime)) {
-      throw new ApiError("INVALID_FILE_TYPE", "Only JPEG, PNG, and WebP images are allowed", 400);
-    }
-    if (buffer.byteLength > MAX_BYTES) {
-      throw new ApiError("FILE_TOO_LARGE", "Image must be 2MB or smaller", 400);
-    }
-    const safeFolder = folder.replace(/[^a-z0-9_-]/gi, "") || "profiles";
-    const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
-    const safe = `${Date.now()}-${randomUUID()}.${ext}`;
+    assertImage(buffer, mime);
+    const safeFolder = safeFolderName(folder);
+    const safe = `${Date.now()}-${randomUUID()}.${imageExt(mime)}`;
     const dir = path.join(/* turbopackIgnore: true */ process.cwd(), this.root, safeFolder);
     await mkdir(dir, { recursive: true });
     await writeFile(path.join(dir, safe), buffer);
@@ -44,17 +56,47 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 }
 
-/** Same interface as local disk — swap this in when S3 credentials are available. */
-export class S3StorageAdapter implements StorageAdapter {
-  async save(): Promise<string> {
-    throw new ApiError("STORAGE_NOT_CONFIGURED", "S3 storage is not configured", 501);
+/** Used on Vercel when BLOB_READ_WRITE_TOKEN is set. */
+export class VercelBlobStorageAdapter implements StorageAdapter {
+  async save(buffer: Buffer, _filename: string, mime: string, folder = "profiles") {
+    assertImage(buffer, mime);
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      throw new ApiError("STORAGE_NOT_CONFIGURED", "BLOB_READ_WRITE_TOKEN is not set", 501);
+    }
+    const safeFolder = safeFolderName(folder);
+    const pathname = `${safeFolder}/${Date.now()}-${randomUUID()}.${imageExt(mime)}`;
+    const blob = await put(pathname, buffer, {
+      access: "public",
+      contentType: mime,
+      addRandomSuffix: false,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    return blob.url;
   }
-  async delete(): Promise<void> {
-    throw new ApiError("STORAGE_NOT_CONFIGURED", "S3 storage is not configured", 501);
+
+  async delete(storedPath: string) {
+    if (!storedPath) return;
+    const isBlob =
+      storedPath.includes(".blob.vercel-storage.com") ||
+      storedPath.startsWith("https://") ||
+      storedPath.startsWith("http://");
+    if (!isBlob) return;
+    try {
+      await del(storedPath, { token: process.env.BLOB_READ_WRITE_TOKEN });
+    } catch {
+      // ignore missing / unauthorized deletes
+    }
   }
 }
 
-export const storage: StorageAdapter = new LocalStorageAdapter();
+function createStorage(): StorageAdapter {
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    return new VercelBlobStorageAdapter();
+  }
+  return new LocalStorageAdapter();
+}
+
+export const storage: StorageAdapter = createStorage();
 
 export async function saveImage(file: File, folder: "profiles" | "logos" = "profiles") {
   const bytes = Buffer.from(await file.arrayBuffer());

@@ -12,7 +12,7 @@ Timezone: **Asia/Kathmandu**. Slot times are stored in UTC and displayed in Nepa
 - Mobile-ready JWT access/refresh tokens (`Authorization: Bearer`)
 - Zod validation, Tailwind CSS + shadcn/ui
 - eSewa v2 + Khalti sandbox via a `PaymentProvider` interface
-- Local `uploads/` with an S3-ready storage adapter
+- Image storage: local `uploads/` in development; Vercel Blob when `BLOB_READ_WRITE_TOKEN` is set
 - Optional FCM (in-app notifications always persist)
 
 ## Quick start
