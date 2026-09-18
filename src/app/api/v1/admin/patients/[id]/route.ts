@@ -55,4 +55,29 @@ export const PATCH = apiHandler(async ({ req, params, user }) => {
   return jsonOk(updated);
 }, { auth: true, roles: [Role.ADMIN] });
 
+export const DELETE = apiHandler(async ({ params, user }) => {
+  const patient = await prisma.patient.findUnique({
+    where: { id: params.id },
+    include: { _count: { select: { appointments: true } } },
+  });
+  if (!patient) throw new ApiError("NOT_FOUND", "Patient not found", 404);
+  if (patient._count.appointments > 0) {
+    throw new ApiError(
+      "HAS_APPOINTMENTS",
+      `Cannot delete patient with ${patient._count.appointments} appointment(s). Deactivate the account instead.`,
+      409,
+    );
+  }
+
+  await prisma.user.delete({ where: { id: patient.userId } });
+  await writeAudit({
+    actorId: user?.id,
+    action: "PATIENT_DELETED",
+    entity: "Patient",
+    entityId: patient.id,
+    payload: { userId: patient.userId },
+  });
+  return jsonOk({ deleted: true });
+}, { auth: true, roles: [Role.ADMIN] });
+
 export const OPTIONS = PATCH;

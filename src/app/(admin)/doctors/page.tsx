@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EntityActions } from "@/components/admin/entity-actions";
 
 export default async function DoctorsPage() {
   const doctors = await prisma.doctor.findMany({
@@ -19,7 +20,7 @@ export default async function DoctorsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Doctors</h1>
-          <p className="text-sm text-muted-foreground">Profiles, fees, departments, and availability</p>
+          <p className="text-sm text-muted-foreground">Create, edit, and delete doctor profiles</p>
         </div>
         <Button asChild>
           <Link href="/doctors/new">Add doctor</Link>
@@ -33,6 +34,7 @@ export default async function DoctorsPage() {
             <TableHead>Fee (NPR)</TableHead>
             <TableHead>Duration</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -51,6 +53,14 @@ export default async function DoctorsPage() {
                 <Badge variant={d.user.status === "ACTIVE" && d.isAvailable ? "success" : "danger"}>
                   {d.user.status === "INACTIVE" ? "Inactive" : d.isAvailable ? "Available" : "Unavailable"}
                 </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <EntityActions
+                  label="doctor"
+                  editHref={`/doctors/${d.id}`}
+                  deleteUrl={`/api/v1/doctors/${d.id}`}
+                  redirectTo="/doctors"
+                />
               </TableCell>
             </TableRow>
           ))}

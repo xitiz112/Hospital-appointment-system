@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { PatientForm } from "@/components/admin/patient-form";
 import { ImageUploadCard } from "@/components/admin/image-upload-card";
 import { PatientStatusButton } from "@/components/admin/patient-status";
+import { DeleteEntityButton } from "@/components/admin/entity-actions";
 import { formatKtm, statusVariant } from "@/lib/format";
 
 export default async function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,12 +25,19 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{patient.user.name}</h1>
           <p className="text-sm text-muted-foreground">{patient.user.email}</p>
         </div>
-        <PatientStatusButton id={patient.id} status={patient.user.status} />
+        <div className="flex flex-wrap items-center gap-2">
+          <PatientStatusButton id={patient.id} status={patient.user.status} />
+          <DeleteEntityButton
+            label="patient"
+            deleteUrl={`/api/v1/admin/patients/${patient.id}`}
+            redirectTo="/patients"
+          />
+        </div>
       </div>
       <ImageUploadCard
         title="Profile picture"
@@ -37,20 +45,23 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         currentUrl={patient.user.imageUrl}
         uploadUrl={`/api/v1/admin/patients/${patient.id}/photo`}
       />
-      <PatientForm
-        patient={{
-          id: patient.id,
-          name: patient.user.name,
-          email: patient.user.email,
-          phone: patient.user.phone,
-          dateOfBirth: patient.dateOfBirth ? patient.dateOfBirth.toISOString().slice(0, 10) : null,
-          gender: patient.gender,
-          address: patient.address,
-          notifyEmail: patient.notifyEmail,
-          notifyPush: patient.notifyPush,
-          notifySms: patient.notifySms,
-        }}
-      />
+      <div>
+        <h2 className="mb-3 text-lg font-semibold">Update patient</h2>
+        <PatientForm
+          patient={{
+            id: patient.id,
+            name: patient.user.name,
+            email: patient.user.email,
+            phone: patient.user.phone,
+            dateOfBirth: patient.dateOfBirth ? patient.dateOfBirth.toISOString().slice(0, 10) : null,
+            gender: patient.gender,
+            address: patient.address,
+            notifyEmail: patient.notifyEmail,
+            notifyPush: patient.notifyPush,
+            notifySms: patient.notifySms,
+          }}
+        />
+      </div>
       <div>
         <h2 className="mb-3 text-lg font-semibold">Appointment history</h2>
         <ul className="space-y-2 text-sm">

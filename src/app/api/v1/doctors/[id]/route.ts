@@ -71,4 +71,32 @@ export const PATCH = apiHandler(async ({ req, params, user }) => {
   return jsonOk(doctor);
 }, { auth: true, roles: [Role.ADMIN, Role.DOCTOR] });
 
+export const DELETE = apiHandler(async ({ params, user }) => {
+  if (!user || user.role !== Role.ADMIN) {
+    throw new ApiError("FORBIDDEN", "Only administrators can delete doctors", 403);
+  }
+  const existing = await prisma.doctor.findUnique({
+    where: { id: params.id },
+    include: { _count: { select: { appointments: true } } },
+  });
+  if (!existing) throw new ApiError("NOT_FOUND", "Doctor not found", 404);
+  if (existing._count.appointments > 0) {
+    throw new ApiError(
+      "HAS_APPOINTMENTS",
+      `Cannot delete doctor with ${existing._count.appointments} appointment(s). Deactivate the account instead.`,
+      409,
+    );
+  }
+
+  await prisma.user.delete({ where: { id: existing.userId } });
+  await writeAudit({
+    actorId: user.id,
+    action: "DOCTOR_DELETED",
+    entity: "Doctor",
+    entityId: existing.id,
+    payload: { userId: existing.userId },
+  });
+  return jsonOk({ deleted: true });
+}, { auth: true, roles: [Role.ADMIN] });
+
 export const OPTIONS = PATCH;

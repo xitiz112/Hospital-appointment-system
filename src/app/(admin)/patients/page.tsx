@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EntityActions } from "@/components/admin/entity-actions";
 import { PatientStatusButton } from "@/components/admin/patient-status";
 import { formatKtm } from "@/lib/format";
 
@@ -31,7 +32,7 @@ export default async function PatientsPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Patients</h1>
-          <p className="text-sm text-muted-foreground">Create, edit, and activate patient accounts</p>
+          <p className="text-sm text-muted-foreground">Create, edit, and delete patient accounts</p>
         </div>
         <Button asChild>
           <Link href="/patients/new">Add patient</Link>
@@ -57,7 +58,7 @@ export default async function PatientsPage({
             <TableHead>Appointments</TableHead>
             <TableHead>Joined</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead />
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -76,7 +77,15 @@ export default async function PatientsPage({
                 <Badge variant={p.user.status === "ACTIVE" ? "success" : "danger"}>{p.user.status}</Badge>
               </TableCell>
               <TableCell className="text-right">
-                <PatientStatusButton id={p.id} status={p.user.status} />
+                <div className="flex flex-col items-end gap-2">
+                  <EntityActions
+                    label="patient"
+                    editHref={`/patients/${p.id}`}
+                    deleteUrl={`/api/v1/admin/patients/${p.id}`}
+                    redirectTo="/patients"
+                  />
+                  <PatientStatusButton id={p.id} status={p.user.status} />
+                </div>
               </TableCell>
             </TableRow>
           ))}

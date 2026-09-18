@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { DoctorForm } from "@/components/admin/doctor-form";
 import { ImageUploadCard } from "@/components/admin/image-upload-card";
 import { ActivateDoctor } from "@/components/admin/activate-doctor";
+import { DeleteEntityButton } from "@/components/admin/entity-actions";
 import { minutesToHHmm } from "@/lib/serialize";
 
 export default async function EditDoctorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -19,12 +20,19 @@ export default async function EditDoctorPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{doctor.user.name}</h1>
           <p className="text-sm text-muted-foreground">{doctor.department.name}</p>
         </div>
-        <ActivateDoctor id={doctor.id} active={doctor.user.status === "ACTIVE"} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ActivateDoctor id={doctor.id} active={doctor.user.status === "ACTIVE"} />
+          <DeleteEntityButton
+            label="doctor"
+            deleteUrl={`/api/v1/doctors/${doctor.id}`}
+            redirectTo="/doctors"
+          />
+        </div>
       </div>
       <ImageUploadCard
         title="Profile picture"
@@ -32,25 +40,28 @@ export default async function EditDoctorPage({ params }: { params: Promise<{ id:
         currentUrl={doctor.user.imageUrl}
         uploadUrl={`/api/v1/doctors/${doctor.id}/photo`}
       />
-      <DoctorForm
-        departments={departments}
-        specializations={specializations}
-        doctor={{
-          id: doctor.id,
-          name: doctor.user.name,
-          email: doctor.user.email,
-          phone: doctor.user.phone,
-          departmentId: doctor.departmentId,
-          specializationId: doctor.specializationId,
-          qualifications: doctor.qualifications,
-          experienceYears: doctor.experienceYears,
-          consultationFee: Number(doctor.consultationFee),
-          appointmentDurationMin: doctor.appointmentDurationMin,
-          location: doctor.location,
-          bio: doctor.bio,
-          isAvailable: doctor.isAvailable,
-        }}
-      />
+      <div>
+        <h2 className="mb-3 text-lg font-semibold">Update doctor</h2>
+        <DoctorForm
+          departments={departments}
+          specializations={specializations}
+          doctor={{
+            id: doctor.id,
+            name: doctor.user.name,
+            email: doctor.user.email,
+            phone: doctor.user.phone,
+            departmentId: doctor.departmentId,
+            specializationId: doctor.specializationId,
+            qualifications: doctor.qualifications,
+            experienceYears: doctor.experienceYears,
+            consultationFee: Number(doctor.consultationFee),
+            appointmentDurationMin: doctor.appointmentDurationMin,
+            location: doctor.location,
+            bio: doctor.bio,
+            isAvailable: doctor.isAvailable,
+          }}
+        />
+      </div>
       <div>
         <h2 className="mb-2 text-lg font-semibold">Weekly hours</h2>
         <ul className="text-sm text-muted-foreground">
