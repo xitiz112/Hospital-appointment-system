@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ export function DoctorForm({
     name: string;
     email: string;
     phone?: string | null;
+    imageUrl?: string | null;
     departmentId: string;
     specializationId?: string | null;
     qualifications?: string | null;
@@ -35,7 +36,29 @@ export function DoctorForm({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(doctor?.imageUrl ?? null);
   const isEdit = Boolean(doctor);
+
+  useEffect(() => {
+    if (!photoFile) {
+      setPreview(doctor?.imageUrl ?? null);
+      return;
+    }
+    const url = URL.createObjectURL(photoFile);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile, doctor?.imageUrl]);
+
+  async function uploadPhoto(doctorId: string, file: File) {
+    const body = new FormData();
+    body.append("file", file);
+    const res = await fetch(`/api/v1/doctors/${doctorId}/photo`, { method: "POST", body });
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.error?.message ?? "Photo upload failed");
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -57,23 +80,63 @@ export function DoctorForm({
       bio: form.get("bio"),
       isAvailable: form.get("isAvailable") === "on",
     };
-    const res = await fetch(isEdit ? `/api/v1/doctors/${doctor!.id}` : "/api/v1/doctors", {
-      method: isEdit ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const json = await res.json();
-    setPending(false);
-    if (!json.success) {
-      setError(json.error?.message ?? "Save failed");
-      return;
+    try {
+      const res = await fetch(isEdit ? `/api/v1/doctors/${doctor!.id}` : "/api/v1/doctors", {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setError(json.error?.message ?? "Save failed");
+        setPending(false);
+        return;
+      }
+      const doctorId = isEdit ? doctor!.id : (json.data?.id as string | undefined);
+      if (photoFile && doctorId) {
+        await uploadPhoto(doctorId, photoFile);
+      }
+      setPending(false);
+      router.push(doctorId ? `/doctors/${doctorId}` : "/doctors");
+      router.refresh();
+    } catch (err) {
+      setPending(false);
+      setError(err instanceof Error ? err.message : "Save failed");
     }
-    router.push("/doctors");
-    router.refresh();
   }
 
   return (
     <form onSubmit={onSubmit} className="grid max-w-2xl gap-4">
+      <div className="space-y-2 rounded-lg border p-4">
+        <Label>Profile image</Label>
+        <p className="text-xs text-muted-foreground">JPEG, PNG, or WebP. Shown in patient and doctor apps.</p>
+        <div className="flex items-center gap-4">
+          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border bg-muted">
+            {preview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={preview} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-xs text-muted-foreground">None</span>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+            />
+            {photoFile ? (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground underline"
+                onClick={() => setPhotoFile(null)}
+              >
+                Clear selected file
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1">
           <Label>Name</Label>

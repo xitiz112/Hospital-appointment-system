@@ -41,10 +41,22 @@ export default async function DoctorsPage() {
           {doctors.map((d) => (
             <TableRow key={d.id}>
               <TableCell>
-                <Link href={`/doctors/${d.id}`} className="font-medium text-primary hover:underline">
-                  {d.user.name}
-                </Link>
-                <div className="text-xs text-muted-foreground">{d.specialization?.name}</div>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-muted">
+                    {d.user.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={d.user.imageUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground">N/A</span>
+                    )}
+                  </div>
+                  <div>
+                    <Link href={`/doctors/${d.id}`} className="font-medium text-primary hover:underline">
+                      {d.user.name}
+                    </Link>
+                    <div className="text-xs text-muted-foreground">{d.specialization?.name}</div>
+                  </div>
+                </div>
               </TableCell>
               <TableCell>{d.department.name}</TableCell>
               <TableCell>{Number(d.consultationFee).toLocaleString()}</TableCell>
