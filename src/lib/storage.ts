@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { ApiError } from "@/lib/errors";
 
 export interface StorageAdapter {
-  save(buffer: Buffer, filename: string, mime: string): Promise<string>;
+  save(buffer: Buffer, filename: string, mime: string, folder?: string): Promise<string>;
   delete(storedPath: string): Promise<void>;
 }
 
@@ -14,22 +14,24 @@ const MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 2 * 1024 * 1024);
 export class LocalStorageAdapter implements StorageAdapter {
   constructor(private root = process.env.UPLOAD_DIR ?? "uploads") {}
 
-  async save(buffer: Buffer, _filename: string, mime: string) {
+  async save(buffer: Buffer, _filename: string, mime: string, folder = "profiles") {
     if (!ALLOWED_TYPES.has(mime)) {
       throw new ApiError("INVALID_FILE_TYPE", "Only JPEG, PNG, and WebP images are allowed", 400);
     }
     if (buffer.byteLength > MAX_BYTES) {
       throw new ApiError("FILE_TOO_LARGE", "Image must be 2MB or smaller", 400);
     }
+    const safeFolder = folder.replace(/[^a-z0-9_-]/gi, "") || "profiles";
     const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
     const safe = `${Date.now()}-${randomUUID()}.${ext}`;
-    const dir = path.join(/* turbopackIgnore: true */ process.cwd(), this.root, "profiles");
+    const dir = path.join(/* turbopackIgnore: true */ process.cwd(), this.root, safeFolder);
     await mkdir(dir, { recursive: true });
     await writeFile(path.join(dir, safe), buffer);
-    return `/api/v1/uploads/profiles/${safe}`;
+    return `/api/v1/uploads/${safeFolder}/${safe}`;
   }
 
   async delete(storedPath: string) {
+    if (!storedPath?.startsWith("/api/v1/uploads/")) return;
     const relative = storedPath.replace(/^\/api\/v1\/uploads\//, "");
     const full = path.resolve(/* turbopackIgnore: true */ process.cwd(), this.root, relative);
     const root = path.resolve(/* turbopackIgnore: true */ process.cwd(), this.root);
@@ -54,7 +56,26 @@ export class S3StorageAdapter implements StorageAdapter {
 
 export const storage: StorageAdapter = new LocalStorageAdapter();
 
-export async function saveProfileImage(file: File) {
+export async function saveImage(file: File, folder: "profiles" | "logos" = "profiles") {
   const bytes = Buffer.from(await file.arrayBuffer());
-  return storage.save(bytes, file.name, file.type || "image/jpeg");
+  return storage.save(bytes, file.name, file.type || "image/jpeg", folder);
+}
+
+export async function saveProfileImage(file: File) {
+  return saveImage(file, "profiles");
+}
+
+export async function saveHospitalLogo(file: File) {
+  return saveImage(file, "logos");
+}
+
+export async function replaceStoredImage(previousUrl: string | null | undefined, nextUrl: string) {
+  if (previousUrl && previousUrl !== nextUrl) {
+    await storage.delete(previousUrl);
+  }
+  return nextUrl;
+}
+
+export async function clearStoredImage(url: string | null | undefined) {
+  if (url) await storage.delete(url);
 }

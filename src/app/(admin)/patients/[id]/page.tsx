@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { PatientForm } from "@/components/admin/patient-form";
+import { ImageUploadCard } from "@/components/admin/image-upload-card";
 import { PatientStatusButton } from "@/components/admin/patient-status";
 import { formatKtm, statusVariant } from "@/lib/format";
 
@@ -30,6 +31,12 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         </div>
         <PatientStatusButton id={patient.id} status={patient.user.status} />
       </div>
+      <ImageUploadCard
+        title="Profile picture"
+        description="Patient photo shown in the mobile apps."
+        currentUrl={patient.user.imageUrl}
+        uploadUrl={`/api/v1/admin/patients/${patient.id}/photo`}
+      />
       <PatientForm
         patient={{
           id: patient.id,

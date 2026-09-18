@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "crypto";
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
 import { Role } from "@prisma/client";
+import { ApiError } from "@/lib/errors";
 
 export type AccessTokenPayload = {
   sub: string;
@@ -24,15 +25,23 @@ export async function signAccessToken(payload: AccessTokenPayload) {
 }
 
 export async function verifyAccessToken(token: string) {
-  const { payload } = await jwtVerify(token, accessSecret());
-  if (!payload.sub || typeof payload.role !== "string" || typeof payload.email !== "string") {
-    throw new Error("Invalid token payload");
+  try {
+    const { payload } = await jwtVerify(token, accessSecret());
+    if (!payload.sub || typeof payload.role !== "string" || typeof payload.email !== "string") {
+      throw new ApiError("INVALID_TOKEN", "Invalid access token", 401);
+    }
+    return {
+      sub: payload.sub,
+      role: payload.role as Role,
+      email: payload.email,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error instanceof JoseErrors.JWTExpired) {
+      throw new ApiError("SESSION_EXPIRED", "Your session has expired. Please sign in again.", 401);
+    }
+    throw new ApiError("INVALID_TOKEN", "Invalid or malformed access token", 401);
   }
-  return {
-    sub: payload.sub,
-    role: payload.role as Role,
-    email: payload.email,
-  };
 }
 
 export function hashToken(token: string) {

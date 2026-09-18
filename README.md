@@ -62,6 +62,8 @@ Seeded hospital: **Kathmandu General Hospital** with six departments (Cardiology
 - **Admin web:** Auth.js Credentials provider, httpOnly JWT session cookie. Only `ADMIN` users can sign in at `/login`.
 - **Patients/doctors (and admin if needed):** `POST /api/v1/auth/login` returns `{ accessToken, refreshToken }`. Send `Authorization: Bearer <accessToken>`.
 - `getCurrentUser()` accepts **either** the Auth.js cookie **or** a Bearer token.
+- Expired access or refresh tokens return `401` with `error.code = "SESSION_EXPIRED"` and message `"Your session has expired. Please sign in again."` — the mobile app should refresh or send the user to login.
+- Admin dashboard: if the web session expires mid-use, the user is redirected to `/login?reason=session_expired` and sees the same message.
 
 ### Vercel production
 

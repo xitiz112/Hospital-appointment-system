@@ -24,12 +24,8 @@ export async function getCurrentUser(req?: NextRequest | Request | null) {
     req?.headers.get("authorization") ?? req?.headers.get("Authorization") ?? "";
   if (header.toLowerCase().startsWith("bearer ")) {
     const token = header.slice(7).trim();
-    try {
-      const payload = await verifyAccessToken(token);
-      return loadUser(payload.sub);
-    } catch {
-      return null;
-    }
+    const payload = await verifyAccessToken(token);
+    return loadUser(payload.sub);
   }
 
   const session = await auth();
@@ -40,7 +36,7 @@ export async function getCurrentUser(req?: NextRequest | Request | null) {
 }
 
 export function assertRole(user: CurrentUser | null, roles: Role[]) {
-  if (!user) throw new ApiError("UNAUTHORIZED", "Authentication required", 401);
+  if (!user) throw new ApiError("UNAUTHORIZED", "Authentication required. Please sign in again.", 401);
   if (user.status !== UserStatus.ACTIVE) {
     throw new ApiError("ACCOUNT_INACTIVE", "Account is inactive", 403);
   }

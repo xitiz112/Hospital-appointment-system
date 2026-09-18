@@ -11,7 +11,11 @@ export const POST = apiHandler(async ({ req }) => {
     include: { user: true },
   });
   if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-    throw new ApiError("INVALID_REFRESH", "Refresh token is invalid or expired", 401);
+    throw new ApiError(
+      "SESSION_EXPIRED",
+      "Your session has expired. Please sign in again.",
+      401,
+    );
   }
 
   await prisma.refreshToken.update({

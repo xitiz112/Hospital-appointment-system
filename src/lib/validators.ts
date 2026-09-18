@@ -137,6 +137,7 @@ export const settingsSchema = z.object({
   email: z.email().optional().nullable(),
   phone: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
+  logoUrl: z.string().optional().nullable(),
   timezone: z.string().optional(),
   cancellationHours: z.number().int().min(0).max(168).optional(),
   paymentRequired: z.boolean().optional(),

@@ -14,13 +14,34 @@ export const GET = apiHandler(async ({ user }) => {
       },
       orderBy: { startAt: "asc" },
       take: 10,
-      include: { doctor: { include: { user: { select: { name: true, imageUrl: true } } } }, payments: true },
+      include: {
+        doctor: {
+          select: {
+            id: true,
+            qualifications: true,
+            consultationFee: true,
+            department: { select: { name: true } },
+            user: { select: { name: true, imageUrl: true } },
+          },
+        },
+        payments: true,
+      },
     }),
     prisma.appointment.findMany({
       where: { patientId: user.patient.id, startAt: { lt: now } },
       orderBy: { startAt: "desc" },
       take: 10,
-      include: { doctor: { include: { user: { select: { name: true } } } } },
+      include: {
+        doctor: {
+          select: {
+            id: true,
+            qualifications: true,
+            consultationFee: true,
+            department: { select: { name: true } },
+            user: { select: { name: true } },
+          },
+        },
+      },
     }),
     prisma.notification.count({ where: { userId: user.id, readAt: null } }),
   ]);

@@ -79,7 +79,10 @@ export function apiHandler<P extends Record<string, string> = Record<string, str
       if (options.auth || options.roles?.length) {
         user = await getCurrentUser(req);
         if (!user) {
-          return withCors(jsonError("UNAUTHORIZED", "Authentication required", 401), req);
+          return withCors(
+            jsonError("UNAUTHORIZED", "Authentication required. Please sign in again.", 401),
+            req,
+          );
         }
         if (user.status !== UserStatus.ACTIVE) {
           return withCors(jsonError("ACCOUNT_INACTIVE", "Account is inactive", 403), req);

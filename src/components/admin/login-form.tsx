@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 
 export function LoginForm() {
   const params = useSearchParams();
+  const sessionExpired = params.get("reason") === "session_expired";
+  const authRequired = params.get("reason") === "auth_required";
   const [email, setEmail] = useState("admin@hospital.local");
   const [password, setPassword] = useState("Password123!");
   const [showPassword, setShowPassword] = useState(false);
@@ -47,6 +49,21 @@ export function LoginForm() {
           Use your staff account to open the hospital dashboard.
         </p>
       </div>
+      {sessionExpired ? (
+        <p
+          className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
+          role="status"
+        >
+          Your session has expired. Please sign in again.
+        </p>
+      ) : authRequired ? (
+        <p
+          className="mb-6 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-950"
+          role="status"
+        >
+          Please sign in to continue.
+        </p>
+      ) : null}
       <form onSubmit={onSubmit} className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="email" className="text-[#2a322c]">

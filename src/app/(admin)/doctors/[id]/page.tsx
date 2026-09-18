@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DoctorForm } from "@/components/admin/doctor-form";
+import { ImageUploadCard } from "@/components/admin/image-upload-card";
 import { ActivateDoctor } from "@/components/admin/activate-doctor";
 import { minutesToHHmm } from "@/lib/serialize";
 
@@ -25,6 +26,12 @@ export default async function EditDoctorPage({ params }: { params: Promise<{ id:
         </div>
         <ActivateDoctor id={doctor.id} active={doctor.user.status === "ACTIVE"} />
       </div>
+      <ImageUploadCard
+        title="Profile picture"
+        description="Doctor photo shown in the patient and doctor apps."
+        currentUrl={doctor.user.imageUrl}
+        uploadUrl={`/api/v1/doctors/${doctor.id}/photo`}
+      />
       <DoctorForm
         departments={departments}
         specializations={specializations}

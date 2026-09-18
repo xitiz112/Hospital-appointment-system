@@ -27,6 +27,7 @@ export const proxy = auth((req) => {
     if (!req.auth || role !== "ADMIN") {
       const login = new URL("/login", req.nextUrl.origin);
       login.searchParams.set("callbackUrl", pathname);
+      login.searchParams.set("reason", "auth_required");
       return NextResponse.redirect(login);
     }
   }

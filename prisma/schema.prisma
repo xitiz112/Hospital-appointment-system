@@ -64,6 +64,8 @@ model Hospital {
   email                         String?
   phone                         String?
   address                       String?
+  /// Public hospital logo (POST/DELETE /api/v1/admin/settings/logo)
+  logoUrl                       String?
   timezone                      String   @default("Asia/Kathmandu")
   cancellationHours             Int      @default(24)
   paymentRequired               Boolean  @default(true)
@@ -116,6 +118,7 @@ model User {
   name         String
   role         Role
   status       UserStatus @default(ACTIVE)
+  /// Profile picture for patients/doctors (POST/DELETE /api/v1/me/photo)
   imageUrl     String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
