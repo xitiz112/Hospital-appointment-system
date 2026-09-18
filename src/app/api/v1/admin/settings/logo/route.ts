@@ -3,13 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { ApiError, apiHandler, jsonOk } from "@/lib/api";
 import { getHospital } from "@/lib/appointments";
 import { writeAudit } from "@/lib/audit";
-import { clearStoredImage, replaceStoredImage, saveHospitalLogo } from "@/lib/storage";
+import {
+  clearStoredImage,
+  isUploadFile,
+  replaceStoredImage,
+  saveHospitalLogo,
+} from "@/lib/storage";
 
 export const POST = apiHandler(async ({ req, user }) => {
   const hospital = await getHospital();
   const form = await req.formData();
   const file = form.get("file") ?? form.get("logo") ?? form.get("photo");
-  if (!(file instanceof File)) {
+  if (!isUploadFile(file)) {
     throw new ApiError("VALIDATION_ERROR", "Expected a file field named file, logo, or photo", 400);
   }
   const logoUrl = await saveHospitalLogo(file);

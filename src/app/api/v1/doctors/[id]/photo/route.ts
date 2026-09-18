@@ -2,7 +2,7 @@ import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ApiError, apiHandler, jsonOk } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
-import { clearStoredImage, replaceStoredImage, saveProfileImage } from "@/lib/storage";
+import { clearStoredImage, isUploadFile, replaceStoredImage, saveProfileImage } from "@/lib/storage";
 
 async function loadDoctor(id: string) {
   return prisma.doctor.findUnique({
@@ -24,7 +24,7 @@ export const POST = apiHandler(async ({ req, user, params }) => {
   if (!canManage(user, doctor.id)) throw new ApiError("FORBIDDEN", "Not allowed", 403);
   const form = await req.formData();
   const file = form.get("file") ?? form.get("photo");
-  if (!(file instanceof File)) {
+  if (!isUploadFile(file)) {
     throw new ApiError("VALIDATION_ERROR", "Expected a file field named file or photo", 400);
   }
   const imageUrl = await saveProfileImage(file);

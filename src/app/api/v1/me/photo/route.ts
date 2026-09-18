@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { ApiError, apiHandler, jsonOk } from "@/lib/api";
-import { clearStoredImage, replaceStoredImage, saveProfileImage } from "@/lib/storage";
+import { clearStoredImage, isUploadFile, replaceStoredImage, saveProfileImage } from "@/lib/storage";
 
 async function readImageFile(req: Request) {
   const form = await req.formData();
   const file = form.get("file") ?? form.get("photo");
-  if (!(file instanceof File)) {
+  if (!isUploadFile(file)) {
     throw new ApiError("VALIDATION_ERROR", "Expected a file field named file or photo", 400);
   }
   return file;

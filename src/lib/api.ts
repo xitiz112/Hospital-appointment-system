@@ -104,7 +104,11 @@ export function apiHandler<P extends Record<string, string> = Record<string, str
         return withCors(jsonError("VALIDATION_ERROR", message, 400, error.issues), req);
       }
       console.error(error);
-      return withCors(jsonError("INTERNAL_ERROR", "Something went wrong", 500), req);
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong";
+      return withCors(jsonError("INTERNAL_ERROR", message, 500), req);
     }
   };
 }

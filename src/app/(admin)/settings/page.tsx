@@ -15,7 +15,7 @@ export default async function SettingsPage() {
       </div>
       <ImageUploadCard
         title="Hospital logo"
-        description="Shown in the patient and doctor apps. JPEG, PNG, or WebP up to 2MB."
+        description="Shown in the patient and doctor apps. JPEG, PNG, or WebP up to 10MB."
         currentUrl={hospital.logoUrl}
         uploadUrl="/api/v1/admin/settings/logo"
         fieldName="logo"

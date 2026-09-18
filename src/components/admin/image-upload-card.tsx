@@ -33,17 +33,22 @@ export function ImageUploadCard({
     setMessage(null);
     const body = new FormData();
     body.append(fieldName, file);
-    const res = await fetch(uploadUrl, { method: "POST", body });
-    const json = await res.json();
-    setPending(false);
-    if (!json.success) {
-      setMessage(json.error?.message ?? "Upload failed");
-      return;
+    try {
+      const res = await fetch(uploadUrl, { method: "POST", body });
+      const json = await res.json().catch(() => null);
+      setPending(false);
+      if (!json?.success) {
+        setMessage(json?.error?.message ?? `Upload failed (HTTP ${res.status})`);
+        return;
+      }
+      const next = json.data?.logoUrl ?? json.data?.imageUrl ?? null;
+      setPreview(next);
+      setMessage("Saved");
+      router.refresh();
+    } catch (err) {
+      setPending(false);
+      setMessage(err instanceof Error ? err.message : "Upload failed");
     }
-    const next = json.data?.logoUrl ?? json.data?.imageUrl ?? null;
-    setPreview(next);
-    setMessage("Saved");
-    router.refresh();
   }
 
   async function remove() {

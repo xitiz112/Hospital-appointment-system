@@ -1,7 +1,7 @@
 import { mkdir, writeFile, unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
-import { del, put } from "@vercel/blob";
+import { BlobError, del, get, put } from "@vercel/blob";
 import { ApiError } from "@/lib/errors";
 
 export interface StorageAdapter {
@@ -10,14 +10,49 @@ export interface StorageAdapter {
 }
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 2 * 1024 * 1024);
+const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
+const BLOB_PROXY_PREFIX = "/api/v1/blob/";
+
+/** Parse env as bytes. Accepts raw bytes ("10485760") or units ("2mb", "10MB"). */
+function resolveMaxUploadBytes(): number {
+  const raw = process.env.MAX_UPLOAD_BYTES?.trim();
+  if (!raw) return DEFAULT_MAX_BYTES;
+
+  const unitMatch = raw.match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/i);
+  if (unitMatch) {
+    const n = Number(unitMatch[1]);
+    const unit = (unitMatch[2] ?? "b").toLowerCase();
+    const mult =
+      unit === "gb" ? 1024 ** 3 : unit === "mb" ? 1024 ** 2 : unit === "kb" ? 1024 : 1;
+    const bytes = Math.round(n * mult);
+    if (Number.isFinite(bytes) && bytes >= 64 * 1024) return bytes;
+  }
+
+  const asNumber = Number(raw);
+  if (Number.isFinite(asNumber) && asNumber >= 64 * 1024) return asNumber;
+  return DEFAULT_MAX_BYTES;
+}
+
+const MAX_BYTES = resolveMaxUploadBytes();
+
+export function isUploadFile(value: unknown): value is File {
+  if (!value || typeof value !== "object") return false;
+  const f = value as Partial<File>;
+  return typeof f.arrayBuffer === "function" && typeof f.size === "number" && typeof f.name === "string";
+}
 
 function assertImage(buffer: Buffer, mime: string) {
   if (!ALLOWED_TYPES.has(mime)) {
     throw new ApiError("INVALID_FILE_TYPE", "Only JPEG, PNG, and WebP images are allowed", 400);
   }
   if (buffer.byteLength > MAX_BYTES) {
-    throw new ApiError("FILE_TOO_LARGE", "Image must be 2MB or smaller", 400);
+    const sizeKb = Math.round(buffer.byteLength / 1024);
+    const maxMb = Math.round((MAX_BYTES / (1024 * 1024)) * 10) / 10;
+    throw new ApiError(
+      "FILE_TOO_LARGE",
+      `Image is ${sizeKb}KB; maximum allowed is ${maxMb}MB`,
+      400,
+    );
   }
 }
 
@@ -27,6 +62,38 @@ function imageExt(mime: string) {
 
 function safeFolderName(folder: string) {
   return folder.replace(/[^a-z0-9_-]/gi, "") || "profiles";
+}
+
+function blobAccess(): "public" | "private" {
+  return process.env.BLOB_ACCESS === "private" ? "private" : "public";
+}
+
+function mapBlobError(error: unknown): never {
+  if (error instanceof ApiError) throw error;
+  const message = error instanceof Error ? error.message : "Blob upload failed";
+  if (/private store/i.test(message) || /public access on a private/i.test(message)) {
+    throw new ApiError(
+      "STORAGE_ACCESS_MISMATCH",
+      "Your Vercel Blob store is Private, but uploads need Public access (or set BLOB_ACCESS=private). Create a new Blob store with Access = Public, reconnect it, and redeploy.",
+      502,
+    );
+  }
+  if (/public store/i.test(message) || /private access on a public/i.test(message)) {
+    throw new ApiError(
+      "STORAGE_ACCESS_MISMATCH",
+      "Your Vercel Blob store is Public. Remove BLOB_ACCESS=private, or create a Private store.",
+      502,
+    );
+  }
+  if (error instanceof BlobError) {
+    throw new ApiError("STORAGE_ERROR", message, 502);
+  }
+  throw new ApiError("STORAGE_ERROR", message || "Blob upload failed", 502);
+}
+
+function isPrivateStoreMismatch(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  return /private store/i.test(message) || /public access on a private/i.test(message);
 }
 
 export class LocalStorageAdapter implements StorageAdapter {
@@ -58,30 +125,62 @@ export class LocalStorageAdapter implements StorageAdapter {
 
 /** Used on Vercel when BLOB_READ_WRITE_TOKEN is set. */
 export class VercelBlobStorageAdapter implements StorageAdapter {
+  private async putOnce(
+    buffer: Buffer,
+    mime: string,
+    folder: string,
+    access: "public" | "private",
+  ) {
+    const safeFolder = safeFolderName(folder);
+    const pathname = `${safeFolder}/${Date.now()}-${randomUUID()}.${imageExt(mime)}`;
+    const blob = await put(pathname, buffer, {
+      access,
+      contentType: mime,
+      addRandomSuffix: false,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    // Private blobs are not anonymous-readable; serve through our proxy.
+    if (access === "private") {
+      return `${BLOB_PROXY_PREFIX}${pathname}`;
+    }
+    return blob.url;
+  }
+
   async save(buffer: Buffer, _filename: string, mime: string, folder = "profiles") {
     assertImage(buffer, mime);
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       throw new ApiError("STORAGE_NOT_CONFIGURED", "BLOB_READ_WRITE_TOKEN is not set", 501);
     }
-    const safeFolder = safeFolderName(folder);
-    const pathname = `${safeFolder}/${Date.now()}-${randomUUID()}.${imageExt(mime)}`;
-    const blob = await put(pathname, buffer, {
-      access: "public",
-      contentType: mime,
-      addRandomSuffix: false,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
-    return blob.url;
+
+    const preferred = blobAccess();
+    try {
+      return await this.putOnce(buffer, mime, folder, preferred);
+    } catch (error) {
+      // Common case: store created as Private (Vercel default) while code uses public.
+      if (preferred === "public" && isPrivateStoreMismatch(error)) {
+        try {
+          return await this.putOnce(buffer, mime, folder, "private");
+        } catch (retryError) {
+          mapBlobError(retryError);
+        }
+      }
+      mapBlobError(error);
+    }
   }
 
   async delete(storedPath: string) {
     if (!storedPath) return;
-    const isBlob =
-      storedPath.includes(".blob.vercel-storage.com") ||
-      storedPath.startsWith("https://") ||
-      storedPath.startsWith("http://");
-    if (!isBlob) return;
     try {
+      if (storedPath.startsWith(BLOB_PROXY_PREFIX)) {
+        const pathname = storedPath.slice(BLOB_PROXY_PREFIX.length);
+        if (pathname) await del(pathname, { token: process.env.BLOB_READ_WRITE_TOKEN });
+        return;
+      }
+      const isBlobUrl =
+        storedPath.includes(".blob.vercel-storage.com") ||
+        storedPath.startsWith("https://") ||
+        storedPath.startsWith("http://");
+      if (!isBlobUrl) return;
       await del(storedPath, { token: process.env.BLOB_READ_WRITE_TOKEN });
     } catch {
       // ignore missing / unauthorized deletes
@@ -89,18 +188,46 @@ export class VercelBlobStorageAdapter implements StorageAdapter {
   }
 }
 
-function createStorage(): StorageAdapter {
+/** Stream a private blob through the app (for img tags). */
+export async function readPrivateBlob(pathname: string) {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  const result =
+    (await get(pathname, { access: "private", token }).catch(() => null)) ??
+    (await get(pathname, { access: "public", token }).catch(() => null));
+
+  if (!result || result.statusCode !== 200 || !result.stream) {
+    throw new ApiError("NOT_FOUND", "File not found", 404);
+  }
+  return {
+    stream: result.stream,
+    contentType: result.blob.contentType ?? "application/octet-stream",
+  };
+}
+
+function getStorage(): StorageAdapter {
+  // Resolve at request time so Vercel runtime env (BLOB_READ_WRITE_TOKEN) is visible.
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     return new VercelBlobStorageAdapter();
   }
   return new LocalStorageAdapter();
 }
 
-export const storage: StorageAdapter = createStorage();
-
 export async function saveImage(file: File, folder: "profiles" | "logos" = "profiles") {
+  const mime = file.type || "image/jpeg";
+  if (!ALLOWED_TYPES.has(mime)) {
+    throw new ApiError("INVALID_FILE_TYPE", "Only JPEG, PNG, and WebP images are allowed", 400);
+  }
+  if (typeof file.size === "number" && file.size > MAX_BYTES) {
+    const sizeKb = Math.round(file.size / 1024);
+    const maxMb = Math.round((MAX_BYTES / (1024 * 1024)) * 10) / 10;
+    throw new ApiError(
+      "FILE_TOO_LARGE",
+      `Image is ${sizeKb}KB; maximum allowed is ${maxMb}MB`,
+      400,
+    );
+  }
   const bytes = Buffer.from(await file.arrayBuffer());
-  return storage.save(bytes, file.name, file.type || "image/jpeg", folder);
+  return getStorage().save(bytes, file.name, mime, folder);
 }
 
 export async function saveProfileImage(file: File) {
@@ -113,11 +240,11 @@ export async function saveHospitalLogo(file: File) {
 
 export async function replaceStoredImage(previousUrl: string | null | undefined, nextUrl: string) {
   if (previousUrl && previousUrl !== nextUrl) {
-    await storage.delete(previousUrl);
+    await getStorage().delete(previousUrl);
   }
   return nextUrl;
 }
 
 export async function clearStoredImage(url: string | null | undefined) {
-  if (url) await storage.delete(url);
+  if (url) await getStorage().delete(url);
 }
