@@ -197,6 +197,8 @@ If `FCM_SERVER_KEY` is empty, push is skipped and in-app `Notification` rows sti
 | GET | `/api/v1/uploads/:path*` | public file serve from `uploads/` |
 | GET | `/api/cron/reminders` | `Authorization: Bearer $CRON_SECRET` |
 
+Vercel Cron is configured in `vercel.json` as **once daily** (`0 3 * * *`, 03:00 UTC ≈ 08:45 Asia/Kathmandu) so it works on the **Hobby** plan (Hobby cannot run hourly/minute crons). Set `CRON_SECRET` in Vercel env; keep `REMINDER_HOURS=24` so each daily run covers the next day’s appointments.
+
 ## Booking example (mobile later)
 
 ```bash
