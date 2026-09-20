@@ -241,4 +241,4 @@ Book and reschedule run in `prisma.$transaction`.
 - Real S3 wiring (adapter interface is ready)
 - Live FCM unless `FCM_SERVER_KEY` is set
 - Telemedicine, EMR, pharmacy/lab, AI
-- Multi-hospital UI (schema already has `Hospital`)
+
