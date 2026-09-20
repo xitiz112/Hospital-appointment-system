@@ -38,7 +38,7 @@ export const GET = apiHandler(async ({ user }) => {
             qualifications: true,
             consultationFee: true,
             department: { select: { name: true } },
-            user: { select: { name: true } },
+            user: { select: { name: true, imageUrl: true } },
           },
         },
       },

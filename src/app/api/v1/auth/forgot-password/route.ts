@@ -1,11 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { apiHandler, jsonOk, readJson } from "@/lib/api";
 import { generateResetToken } from "@/lib/jwt";
+import { sendPasswordResetEmail } from "@/lib/mail";
 import { forgotPasswordSchema } from "@/lib/validators";
 
 export const POST = apiHandler(async ({ req }) => {
   const body = forgotPasswordSchema.parse(await readJson(req));
   const user = await prisma.user.findUnique({ where: { email: body.email.toLowerCase() } });
+  let emailStatus: "sent" | "skipped_no_user" | "failed" | "dev_console" = "skipped_no_user";
+  let emailError: string | null = null;
+
   if (user) {
     const { token, tokenHash } = generateResetToken();
     await prisma.passwordResetToken.create({
@@ -16,10 +20,29 @@ export const POST = apiHandler(async ({ req }) => {
       },
     });
     const url = `${process.env.APP_URL ?? "http://localhost:3000"}/reset-password?token=${token}`;
-    console.log(`[password-reset] ${user.email} ${url}`);
+    try {
+      const result = await sendPasswordResetEmail(user.email, url);
+      emailStatus = result.channel === "console" ? "dev_console" : "sent";
+      if (result.channel === "console") {
+        console.log(`[password-reset] console fallback for ${user.email}: ${url}`);
+      }
+    } catch (error) {
+      emailStatus = "failed";
+      emailError = error instanceof Error ? error.message : String(error);
+      console.error("[password-reset] email failed", emailError);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`[password-reset] fallback link for ${user.email}: ${url}`);
+      }
+    }
   }
+
+  // Always return the same user-facing message (don't leak whether email exists).
+  // In non-production, include delivery diagnostics so setup issues are obvious.
   return jsonOk({
-    message: "If that email exists, a reset link was created. In development it is logged to the server console.",
+    message: "If that email exists, a password reset link has been sent.",
+    ...(process.env.NODE_ENV !== "production"
+      ? { debug: { emailStatus, emailError } }
+      : {}),
   });
 });
 

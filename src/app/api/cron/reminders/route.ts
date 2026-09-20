@@ -4,10 +4,18 @@ import { AppointmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { notifyUser } from "@/lib/notifications";
 
-export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
+function authorized(req: NextRequest) {
+  const secret = process.env.CRON_SECRET?.trim();
+  if (!secret) return false;
   const header = req.headers.get("authorization") ?? "";
-  if (!secret || header !== `Bearer ${secret}`) {
+  if (header === `Bearer ${secret}`) return true;
+  // Vercel Cron may send the secret this way depending on project settings
+  const cronHeader = req.headers.get("x-vercel-cron-secret") ?? "";
+  return cronHeader === secret;
+}
+
+export async function GET(req: NextRequest) {
+  if (!authorized(req)) {
     return NextResponse.json(
       { success: false, data: null, error: { code: "UNAUTHORIZED", message: "Invalid cron secret" }, meta: null },
       { status: 401 },
