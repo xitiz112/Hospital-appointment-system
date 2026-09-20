@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { apiHandler, jsonOk, readJson } from "@/lib/api";
 import { generateResetToken } from "@/lib/jwt";
 import { sendPasswordResetEmail } from "@/lib/mail";
+import { buildPasswordResetLinks } from "@/lib/password-reset-link";
 import { forgotPasswordSchema } from "@/lib/validators";
 
 export const POST = apiHandler(async ({ req }) => {
@@ -19,30 +20,37 @@ export const POST = apiHandler(async ({ req }) => {
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       },
     });
-    const url = `${process.env.APP_URL ?? "http://localhost:3000"}/reset-password?token=${token}`;
+    let links;
     try {
-      const result = await sendPasswordResetEmail(user.email, url);
+      links = buildPasswordResetLinks(token, user.role);
+    } catch (error) {
+      emailStatus = "failed";
+      emailError = error instanceof Error ? error.message : String(error);
+      console.error("[password-reset] link build failed", emailError);
+      return jsonOk({
+        message: "If that email exists, a password reset link has been sent.",
+        ...(process.env.NODE_ENV !== "production" ? { debug: { emailStatus, emailError } } : {}),
+      });
+    }
+    try {
+      const result = await sendPasswordResetEmail(user.email, links);
       emailStatus = result.channel === "console" ? "dev_console" : "sent";
       if (result.channel === "console") {
-        console.log(`[password-reset] console fallback for ${user.email}: ${url}`);
+        console.log(`[password-reset] console fallback for ${user.email}: ${links.primary}`);
       }
     } catch (error) {
       emailStatus = "failed";
       emailError = error instanceof Error ? error.message : String(error);
       console.error("[password-reset] email failed", emailError);
       if (process.env.NODE_ENV !== "production") {
-        console.log(`[password-reset] fallback link for ${user.email}: ${url}`);
+        console.log(`[password-reset] fallback link for ${user.email}: ${links.primary}`);
       }
     }
   }
 
-  // Always return the same user-facing message (don't leak whether email exists).
-  // In non-production, include delivery diagnostics so setup issues are obvious.
   return jsonOk({
     message: "If that email exists, a password reset link has been sent.",
-    ...(process.env.NODE_ENV !== "production"
-      ? { debug: { emailStatus, emailError } }
-      : {}),
+    ...(process.env.NODE_ENV !== "production" ? { debug: { emailStatus, emailError } } : {}),
   });
 });
 

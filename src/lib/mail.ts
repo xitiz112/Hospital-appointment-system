@@ -70,21 +70,34 @@ export async function sendEmail(input: SendEmailInput) {
   return { channel: "console" as const };
 }
 
-export async function sendPasswordResetEmail(to: string, resetUrl: string) {
+/** Password reset email — opens the Expo/native app (via https bridge), not a web form. */
+export async function sendPasswordResetEmail(
+  to: string,
+  links: { primary: string; app: string },
+) {
   return sendEmail({
     to,
     subject: "Reset your hospital appointment password",
     text: [
       "You requested a password reset.",
       "",
-      "Open this link within 1 hour to choose a new password:",
-      resetUrl,
+      "Tap this link to open the app and choose a new password (expires in 1 hour):",
+      links.primary,
+      "",
+      "If the app does not open, paste this into Expo / your phone browser after installing the app:",
+      links.app,
       "",
       "If you did not request this, you can ignore this email.",
     ].join("\n"),
     html: `
       <p>You requested a password reset.</p>
-      <p><a href="${resetUrl}">Reset your password</a> (link expires in 1 hour).</p>
+      <p>
+        <a href="${links.primary}"
+           style="display:inline-block;padding:12px 18px;background:#1B4F72;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">
+          Open app to reset password
+        </a>
+      </p>
+      <p style="font-size:12px;color:#666;">This opens the mobile app reset screen (not a website form). Link expires in 1 hour.</p>
       <p>If you did not request this, you can ignore this email.</p>
     `,
   });

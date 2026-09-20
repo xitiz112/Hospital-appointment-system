@@ -165,6 +165,20 @@ Statuses: `PENDING` (awaiting payment when required) → `CONFIRMED` (after paym
 
 Successful verify or cash mark-paid → `Payment.status = SUCCESS` and the appointment becomes `CONFIRMED` (notifications sent). Failed verify → `Payment.status = FAILED`, appointment stays `PENDING`.
 
+### Password reset links (Expo app only)
+
+Email does **not** open a web password form. It links to `/open-reset`, which hands off to the Expo / native app.
+
+Set on Vercel:
+
+```env
+APP_URL="https://hospital-appointment-system-lyart.vercel.app"
+PASSWORD_RESET_URL_TEMPLATE="exp://YOUR_LAN_OR_TUNNEL/--/reset-password?token={token}"
+NEXT_PUBLIC_PASSWORD_RESET_URL_TEMPLATE="exp://YOUR_LAN_OR_TUNNEL/--/reset-password?token={token}"
+```
+
+Use the same host shown by `npx expo start`. In the app, add a `reset-password` screen that reads `token` and calls `POST /api/v1/auth/reset-password`.
+
 ### Notifications & devices
 | Method | Path | Auth |
 |--------|------|------|
