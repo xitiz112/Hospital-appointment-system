@@ -4,29 +4,51 @@ import { hashToken } from "@/lib/jwt";
 import { hashPassword } from "@/lib/password";
 import { resetPasswordSchema } from "@/lib/validators";
 
+function normalizeResetToken(raw: string) {
+  const trimmed = raw.trim();
+  try {
+    // Deep links often URI-encode the token; hashing must use the raw hex value.
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
 export const POST = apiHandler(async ({ req }) => {
   const body = resetPasswordSchema.parse(await readJson(req));
+  const token = normalizeResetToken(body.token);
+  const tokenHash = hashToken(token);
+
   const stored = await prisma.passwordResetToken.findUnique({
-    where: { tokenHash: hashToken(body.token) },
+    where: { tokenHash },
   });
   if (!stored || stored.usedAt || stored.expiresAt < new Date()) {
     throw new ApiError("INVALID_TOKEN", "Reset token is invalid or expired", 400);
   }
-  await prisma.$transaction([
-    prisma.user.update({
+
+  // Hash before the transaction so we never leave a half-applied update.
+  const passwordHash = await hashPassword(body.password);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
       where: { id: stored.userId },
-      data: { passwordHash: await hashPassword(body.password) },
-    }),
-    prisma.passwordResetToken.update({
-      where: { id: stored.id },
+      data: { passwordHash },
+    });
+    // Consume this token and any other outstanding reset tokens for the user.
+    await tx.passwordResetToken.updateMany({
+      where: { userId: stored.userId, usedAt: null },
       data: { usedAt: new Date() },
-    }),
-    prisma.refreshToken.updateMany({
+    });
+    await tx.refreshToken.updateMany({
       where: { userId: stored.userId, revokedAt: null },
       data: { revokedAt: new Date() },
-    }),
-  ]);
-  return jsonOk({ reset: true });
+    });
+  });
+
+  return jsonOk({
+    reset: true,
+    message: "Password updated. Sign in with your new password.",
+  });
 });
 
 export const OPTIONS = POST;

@@ -25,7 +25,20 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(10),
-  password: z.string().min(8),
+  // Accept common mobile field aliases
+  password: z.string().min(8).optional(),
+  newPassword: z.string().min(8).optional(),
+}).transform((data, ctx) => {
+  const password = data.password ?? data.newPassword;
+  if (!password || password.length < 8) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Password must be at least 8 characters",
+      path: ["password"],
+    });
+    return z.NEVER;
+  }
+  return { token: data.token, password };
 });
 
 export const patchMeSchema = z.object({

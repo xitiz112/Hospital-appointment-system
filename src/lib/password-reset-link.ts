@@ -63,7 +63,9 @@ export function buildPasswordResetLinks(token: string, role: Role): PasswordRese
   const encoded = encodeURIComponent(token);
   const app = buildAppResetDeepLink(token, role);
   const webBase = resolveWebBaseUrl();
-  const bridge = `${webBase}/open-reset?token=${encoded}`;
+  const roleParam =
+    role === Role.DOCTOR ? "doctor" : role === Role.PATIENT ? "patient" : "patient";
+  const bridge = `${webBase}/open-reset?token=${encoded}&role=${roleParam}`;
 
   try {
     const parsed = new URL(bridge);
