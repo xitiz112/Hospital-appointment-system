@@ -1,18 +1,10 @@
-import { prisma } from "@/lib/prisma";
+import { adminDoctorOptions, adminPatientOptions } from "@/lib/admin-queries";
 import { BookAppointmentForm } from "@/components/admin/book-appointment-form";
 
 export default async function NewAppointmentPage() {
   const [doctors, patients] = await Promise.all([
-    prisma.doctor.findMany({
-      where: { isAvailable: true, user: { status: "ACTIVE" } },
-      include: { user: true },
-      orderBy: { user: { name: "asc" } },
-    }),
-    prisma.patient.findMany({
-      where: { user: { status: "ACTIVE" } },
-      include: { user: true },
-      orderBy: { user: { name: "asc" } },
-    }),
+    adminDoctorOptions({ availableOnly: true }),
+    adminPatientOptions(),
   ]);
   return (
     <div className="space-y-6">

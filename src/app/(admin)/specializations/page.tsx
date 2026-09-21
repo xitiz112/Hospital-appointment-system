@@ -3,8 +3,14 @@ import { SpecializationManager } from "@/components/admin/specialization-manager
 
 export default async function SpecializationsPage() {
   const [departments, specializations] = await Promise.all([
-    prisma.department.findMany({ orderBy: { name: "asc" } }),
-    prisma.specialization.findMany({ orderBy: { name: "asc" } }),
+    prisma.department.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.specialization.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, departmentId: true },
+    }),
   ]);
   return (
     <div className="space-y-6">

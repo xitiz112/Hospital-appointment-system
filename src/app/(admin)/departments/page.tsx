@@ -9,7 +9,13 @@ import { CreateDepartmentForm, ToggleDepartment } from "@/components/admin/depar
 export default async function DepartmentsPage() {
   const departments = await prisma.department.findMany({
     orderBy: { name: "asc" },
-    include: { _count: { select: { doctors: true, specializations: true } } },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      isActive: true,
+      _count: { select: { doctors: true, specializations: true } },
+    },
   });
 
   return (

@@ -8,7 +8,15 @@ import { formatKtm, statusVariant } from "@/lib/format";
 export default async function UsersPage() {
   const users = await prisma.user.findMany({
     orderBy: [{ role: "asc" }, { name: "asc" }],
-    include: { patient: { select: { id: true } }, doctor: { select: { id: true } } },
+    take: 200,
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      createdAt: true,
+    },
   });
   return (
     <div className="space-y-8">

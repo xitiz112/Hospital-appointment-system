@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { AppointmentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  adminDoctorOptions,
+  adminPatientOptions,
+  getHospitalCached,
+} from "@/lib/admin-queries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,12 +18,15 @@ const STATUSES = ["ALL", ...Object.values(AppointmentStatus)];
 export default async function AppointmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; doctorId?: string; patientId?: string }>;
+  searchParams: Promise<{ status?: string; doctorId?: string; patientId?: string; page?: string }>;
 }) {
   const q = await searchParams;
   const status = q.status && q.status !== "ALL" ? (q.status as AppointmentStatus) : undefined;
+  const page = Math.max(1, Number(q.page ?? 1));
+  const pageSize = 50;
+
   const [hospital, appointments, doctors, patients] = await Promise.all([
-    prisma.hospital.findFirst(),
+    getHospitalCached(),
     prisma.appointment.findMany({
       where: {
         ...(status ? { status } : {}),
@@ -26,15 +34,26 @@ export default async function AppointmentsPage({
         ...(q.patientId ? { patientId: q.patientId } : {}),
       },
       orderBy: { startAt: "desc" },
-      take: 150,
-      include: {
-        doctor: { include: { user: true } },
-        patient: { include: { user: true } },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        startAt: true,
+        status: true,
+        patientId: true,
+        doctorId: true,
+        doctor: {
+          select: {
+            consultationFee: true,
+            user: { select: { name: true } },
+          },
+        },
+        patient: { select: { user: { select: { name: true } } } },
         payments: { select: { status: true } },
       },
     }),
-    prisma.doctor.findMany({ include: { user: true }, orderBy: { user: { name: "asc" } } }),
-    prisma.patient.findMany({ include: { user: true }, orderBy: { user: { name: "asc" } } }),
+    adminDoctorOptions(),
+    adminPatientOptions(),
   ]);
   const paymentRequired = hospital?.paymentRequired ?? true;
 
@@ -128,6 +147,41 @@ export default async function AppointmentsPage({
           ))}
         </TableBody>
       </Table>
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>
+          Page {page} · {appointments.length} row{appointments.length === 1 ? "" : "s"}
+        </span>
+        <div className="flex gap-2">
+          {page > 1 ? (
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={`/appointments?${new URLSearchParams({
+                  ...(q.status ? { status: q.status } : {}),
+                  ...(q.doctorId ? { doctorId: q.doctorId } : {}),
+                  ...(q.patientId ? { patientId: q.patientId } : {}),
+                  page: String(page - 1),
+                }).toString()}`}
+              >
+                Previous
+              </Link>
+            </Button>
+          ) : null}
+          {appointments.length === pageSize ? (
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={`/appointments?${new URLSearchParams({
+                  ...(q.status ? { status: q.status } : {}),
+                  ...(q.doctorId ? { doctorId: q.doctorId } : {}),
+                  ...(q.patientId ? { patientId: q.patientId } : {}),
+                  page: String(page + 1),
+                }).toString()}`}
+              >
+                Next
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

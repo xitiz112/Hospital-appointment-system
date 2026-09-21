@@ -6,19 +6,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 export default async function ReportsPage() {
   const from = subDays(new Date(), 14);
-  const appointments = await prisma.appointment.findMany({
-    where: { createdAt: { gte: from } },
-    select: { status: true, startAt: true },
-  });
-  const payments = await prisma.payment.findMany({
-    where: { status: PaymentStatus.SUCCESS, paidAt: { gte: from } },
-    select: { amount: true, paidAt: true },
-  });
+
+  const [statusGroups, appointments, payments] = await Promise.all([
+    prisma.appointment.groupBy({
+      by: ["status"],
+      where: { createdAt: { gte: from } },
+      _count: { _all: true },
+    }),
+    prisma.appointment.findMany({
+      where: { createdAt: { gte: from } },
+      select: { startAt: true },
+    }),
+    prisma.payment.findMany({
+      where: { status: PaymentStatus.SUCCESS, paidAt: { gte: from } },
+      select: { amount: true, paidAt: true },
+    }),
+  ]);
 
   const byStatus: Record<string, number> = {};
+  for (const row of statusGroups) {
+    byStatus[row.status] = row._count._all;
+  }
+
   const byDay: Record<string, { appointments: number; revenue: number }> = {};
   for (const a of appointments) {
-    byStatus[a.status] = (byStatus[a.status] ?? 0) + 1;
     const key = format(a.startAt, "yyyy-MM-dd");
     byDay[key] ??= { appointments: 0, revenue: 0 };
     byDay[key].appointments += 1;

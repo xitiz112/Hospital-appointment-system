@@ -1,10 +1,25 @@
+import { subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { ScheduleEditor } from "@/components/admin/schedule-editor";
 
 export default async function SchedulesPage() {
+  const since = subDays(new Date(), 7);
   const doctors = await prisma.doctor.findMany({
-    include: { user: true, schedules: true, breaks: true, unavailability: { orderBy: { startAt: "desc" } } },
+    where: { user: { status: "ACTIVE" } },
     orderBy: { user: { name: "asc" } },
+    take: 100,
+    select: {
+      id: true,
+      user: { select: { name: true } },
+      schedules: { select: { weekday: true, startMin: true, endMin: true } },
+      breaks: { select: { weekday: true, startMin: true, endMin: true, label: true } },
+      unavailability: {
+        where: { endAt: { gte: since } },
+        orderBy: { startAt: "desc" },
+        take: 40,
+        select: { id: true, startAt: true, endAt: true, reason: true },
+      },
+    },
   });
   return (
     <div className="space-y-6">

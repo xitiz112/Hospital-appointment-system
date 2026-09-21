@@ -10,9 +10,12 @@ import { formatKtm } from "@/lib/format";
 export default async function PatientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, page: pageRaw } = await searchParams;
+  const page = Math.max(1, Number(pageRaw ?? 1));
+  const pageSize = 50;
+
   const patients = await prisma.patient.findMany({
     where: q
       ? {
@@ -23,8 +26,15 @@ export default async function PatientsPage({
           ],
         }
       : {},
-    include: { user: true, _count: { select: { appointments: true } } },
+    select: {
+      id: true,
+      createdAt: true,
+      user: { select: { name: true, email: true, phone: true, status: true } },
+      _count: { select: { appointments: true } },
+    },
     orderBy: { createdAt: "desc" },
+    skip: (page - 1) * pageSize,
+    take: pageSize,
   });
 
   return (
@@ -91,6 +101,37 @@ export default async function PatientsPage({
           ))}
         </TableBody>
       </Table>
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>
+          Page {page} · {patients.length} row{patients.length === 1 ? "" : "s"}
+        </span>
+        <div className="flex gap-2">
+          {page > 1 ? (
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={`/patients?${new URLSearchParams({
+                  ...(q ? { q } : {}),
+                  page: String(page - 1),
+                }).toString()}`}
+              >
+                Previous
+              </Link>
+            </Button>
+          ) : null}
+          {patients.length === pageSize ? (
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={`/patients?${new URLSearchParams({
+                  ...(q ? { q } : {}),
+                  page: String(page + 1),
+                }).toString()}`}
+              >
+                Next
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

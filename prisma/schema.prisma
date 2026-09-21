@@ -94,6 +94,7 @@ model Department {
   @@unique([hospitalId, name])
   @@index([hospitalId])
   @@index([name])
+  @@index([isActive])
 }
 
 model Specialization {
@@ -182,6 +183,8 @@ model Doctor {
   @@index([specializationId])
   @@index([isAvailable])
   @@index([consultationFee])
+  /// Doctor list sort by experience
+  @@index([experienceYears])
 }
 
 model DoctorSchedule {
@@ -247,6 +250,12 @@ model Appointment {
   @@index([patientId, startAt])
   @@index([hospitalId, startAt])
   @@index([status])
+  /// Dashboard / list filters: status + time window
+  @@index([status, startAt])
+  /// Reminder cron: upcoming not-yet-reminded appointments
+  @@index([reminderSentAt, startAt])
+  /// Recent bookings on admin dashboard
+  @@index([createdAt])
 }
 
 model AppointmentCancellation {
@@ -293,6 +302,10 @@ model Payment {
   @@index([appointmentId])
   @@index([status])
   @@index([provider])
+  /// eSewa/Khalti verify + return callbacks look up by gatewayRef
+  @@index([gatewayRef])
+  /// Reports / admin revenue by paid window
+  @@index([status, paidAt])
 }
 
 model Notification {
@@ -307,6 +320,8 @@ model Notification {
   createdAt DateTime         @default(now())
 
   @@index([userId, createdAt])
+  /// Unread badge / dashboard counts
+  @@index([userId, readAt])
 }
 
 model DeviceToken {
@@ -320,6 +335,8 @@ model DeviceToken {
 
   @@unique([userId, token])
   @@index([userId])
+  /// Cleanup of stale FCM tokens after push failures
+  @@index([token])
 }
 
 model AuditLog {

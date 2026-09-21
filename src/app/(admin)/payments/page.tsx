@@ -13,12 +13,18 @@ export default async function PaymentsPage({
   const q = await searchParams;
   const payments = await prisma.payment.findMany({
     orderBy: { createdAt: "desc" },
-    take: 100,
-    include: {
+    take: 50,
+    select: {
+      id: true,
+      createdAt: true,
+      amount: true,
+      provider: true,
+      status: true,
+      receiptNumber: true,
       appointment: {
-        include: {
-          patient: { include: { user: true } },
-          doctor: { include: { user: true } },
+        select: {
+          patient: { select: { user: { select: { name: true } } } },
+          doctor: { select: { user: { select: { name: true } } } },
         },
       },
     },

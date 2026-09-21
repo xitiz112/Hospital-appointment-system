@@ -17,6 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { getHospitalCached } from "@/lib/admin-queries";
 import { Badge } from "@/components/ui/badge";
 import { formatKtm, statusVariant } from "@/lib/format";
 import { HOSPITAL_TZ } from "@/lib/serialize";
@@ -61,8 +62,19 @@ function greetingForHour(hour: number) {
   return "Good evening";
 }
 
+const apptListSelect = {
+  id: true,
+  startAt: true,
+  status: true,
+  patient: { select: { user: { select: { name: true } } } },
+  doctor: { select: { user: { select: { name: true } } } },
+} as const;
+
 export default async function DashboardPage() {
   const now = new Date();
+  const dayStart = startOfDay(now);
+  const dayEnd = endOfDay(now);
+
   const [
     hospital,
     patients,
@@ -74,19 +86,19 @@ export default async function DashboardPage() {
     pendingPayments,
     todayList,
     recent,
-  ] = await prisma.$transaction([
-    prisma.hospital.findFirst(),
+  ] = await Promise.all([
+    getHospitalCached(),
     prisma.patient.count({ where: { user: { status: UserStatus.ACTIVE } } }),
     prisma.doctor.count({ where: { user: { status: UserStatus.ACTIVE } } }),
     prisma.appointment.count({
       where: {
-        startAt: { gte: startOfDay(now), lte: endOfDay(now) },
+        startAt: { gte: dayStart, lte: dayEnd },
         status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.RESCHEDULED] },
       },
     }),
     prisma.appointment.count({
       where: {
-        startAt: { gt: endOfDay(now), lte: addDays(endOfDay(now), 7) },
+        startAt: { gt: dayEnd, lte: addDays(dayEnd, 7) },
         status: { in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED] },
       },
     }),
@@ -95,26 +107,22 @@ export default async function DashboardPage() {
       where: { status: PaymentStatus.SUCCESS },
       _sum: { amount: true },
     }),
-    prisma.payment.count({ where: { status: { in: [PaymentStatus.PENDING, PaymentStatus.INITIATED] } } }),
+    prisma.payment.count({
+      where: { status: { in: [PaymentStatus.PENDING, PaymentStatus.INITIATED] } },
+    }),
     prisma.appointment.findMany({
       where: {
-        startAt: { gte: startOfDay(now), lte: endOfDay(now) },
+        startAt: { gte: dayStart, lte: dayEnd },
         status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.RESCHEDULED] },
       },
       orderBy: { startAt: "asc" },
       take: 8,
-      include: {
-        patient: { include: { user: true } },
-        doctor: { include: { user: true } },
-      },
+      select: apptListSelect,
     }),
     prisma.appointment.findMany({
       orderBy: { createdAt: "desc" },
       take: 8,
-      include: {
-        patient: { include: { user: true } },
-        doctor: { include: { user: true } },
-      },
+      select: apptListSelect,
     }),
   ]);
 

@@ -8,10 +8,15 @@ import { EntityActions } from "@/components/admin/entity-actions";
 export default async function DoctorsPage() {
   const doctors = await prisma.doctor.findMany({
     orderBy: { user: { name: "asc" } },
-    include: {
-      user: true,
-      department: true,
-      specialization: true,
+    take: 200,
+    select: {
+      id: true,
+      consultationFee: true,
+      appointmentDurationMin: true,
+      isAvailable: true,
+      user: { select: { name: true, status: true, imageUrl: true } },
+      department: { select: { name: true } },
+      specialization: { select: { name: true } },
     },
   });
 
