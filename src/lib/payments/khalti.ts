@@ -1,50 +1,31 @@
-import { PaymentProviderType } from "@prisma/client";
+import { ApiError } from "@/lib/errors";
 import type { PaymentProvider } from "./index";
 
 function secret() {
-  return process.env.KHALTI_SECRET_KEY ?? "";
+  return process.env.KHALTI_SECRET_KEY?.trim() ?? "";
 }
 
+function envOr(name: string, fallback: string) {
+  const value = process.env[name]?.trim();
+  return value || fallback;
+}
+
+/** Khalti initiate is disabled — payments go through eSewa only for now. */
 export const khaltiProvider: PaymentProvider = {
-  async initiate({ amount, transactionUuid, purchaseOrderName }) {
-    const initiateUrl =
-      process.env.KHALTI_INITIATE_URL ?? "https://dev.khalti.com/api/v2/epayment/initiate/";
-    const res = await fetch(initiateUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Key ${secret()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        return_url: process.env.KHALTI_RETURN_URL,
-        website_url: process.env.APP_URL ?? "http://localhost:3000",
-        amount: Math.round(amount * 100),
-        purchase_order_id: transactionUuid,
-        purchase_order_name: purchaseOrderName,
-      }),
-    });
-    const raw = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      return {
-        provider: PaymentProviderType.KHALTI,
-        payload: { error: raw, ok: false },
-      };
-    }
-    return {
-      provider: PaymentProviderType.KHALTI,
-      payload: {
-        pidx: raw.pidx,
-        paymentUrl: raw.payment_url,
-        expiresAt: raw.expires_at,
-        expiresIn: raw.expires_in,
-      },
-    };
+  async initiate() {
+    throw new ApiError(
+      "PROVIDER_DISABLED",
+      "Khalti is disabled. Use eSewa (provider: \"ESEWA\").",
+      400,
+    );
   },
 
   async verify({ pidx }) {
     if (!pidx) return { ok: false };
-    const lookupUrl =
-      process.env.KHALTI_LOOKUP_URL ?? "https://dev.khalti.com/api/v2/epayment/lookup/";
+    const lookupUrl = envOr(
+      "KHALTI_LOOKUP_URL",
+      "https://dev.khalti.com/api/v2/epayment/lookup/",
+    );
     const res = await fetch(lookupUrl, {
       method: "POST",
       headers: {

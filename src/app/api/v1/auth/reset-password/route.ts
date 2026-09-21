@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ApiError, apiHandler, jsonOk, readJson } from "@/lib/api";
 import { hashToken } from "@/lib/jwt";
-import { hashPassword } from "@/lib/password";
+import { hashPassword, verifyPassword } from "@/lib/password";
 import { resetPasswordSchema } from "@/lib/validators";
 
 function normalizeResetToken(raw: string) {
@@ -24,6 +24,20 @@ export const POST = apiHandler(async ({ req }) => {
   });
   if (!stored || stored.usedAt || stored.expiresAt < new Date()) {
     throw new ApiError("INVALID_TOKEN", "Reset token is invalid or expired", 400);
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: stored.userId } });
+  if (!user) {
+    throw new ApiError("INVALID_TOKEN", "Reset token is invalid or expired", 400);
+  }
+
+  // Prevent a no-op "reset" that leaves the old password working.
+  if (await verifyPassword(body.password, user.passwordHash)) {
+    throw new ApiError(
+      "SAME_PASSWORD",
+      "Choose a different password than the one you use now.",
+      400,
+    );
   }
 
   // Hash before the transaction so we never leave a half-applied update.

@@ -32,8 +32,11 @@ async function nextReceiptNumber() {
 export async function initiatePayment(
   user: CurrentUser,
   appointmentId: string,
-  provider: "ESEWA" | "KHALTI",
+  _requestedProvider: "ESEWA" | "KHALTI" = "ESEWA",
 ) {
+  // Khalti is disabled for now — always initiate via eSewa.
+  const provider = "ESEWA" as const;
+
   const appointment = await prisma.appointment.findUnique({
     where: { id: appointmentId },
     include: { patient: true, doctor: { include: { user: true } }, payments: true },
@@ -53,7 +56,7 @@ export async function initiatePayment(
       data: {
         appointmentId,
         amount,
-        provider: provider as PaymentProviderType,
+        provider: PaymentProviderType.ESEWA,
         status: PaymentStatus.PENDING,
       },
     }));
@@ -61,7 +64,7 @@ export async function initiatePayment(
   const payment = await prisma.payment.update({
     where: { id: existing.id },
     data: {
-      provider: provider as PaymentProviderType,
+      provider: PaymentProviderType.ESEWA,
       status: PaymentStatus.INITIATED,
       gatewayRef: transactionUuid,
       metadata: { transactionUuid },
@@ -74,16 +77,6 @@ export async function initiatePayment(
     transactionUuid,
     purchaseOrderName: `Consultation with ${appointment.doctor.user.name}`,
   });
-
-  if (provider === "KHALTI" && result.payload.pidx) {
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        gatewayRef: String(result.payload.pidx),
-        metadata: { transactionUuid, pidx: result.payload.pidx },
-      },
-    });
-  }
 
   return { payment, ...result };
 }

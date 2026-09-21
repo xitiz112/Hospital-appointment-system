@@ -114,8 +114,12 @@ export function apiHandler<P extends Record<string, string> = Record<string, str
 }
 
 export async function readJson<T>(req: NextRequest): Promise<T> {
+  const text = await req.text();
+  if (!text.trim()) {
+    return {} as T;
+  }
   try {
-    return (await req.json()) as T;
+    return JSON.parse(text) as T;
   } catch {
     throw new ApiError("INVALID_JSON", "Request body must be valid JSON", 400);
   }

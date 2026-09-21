@@ -129,7 +129,8 @@ export const statusSchema = z.object({
 
 export const initiatePaymentSchema = z.object({
   appointmentId: z.string().min(1),
-  provider: z.enum(["ESEWA", "KHALTI"]),
+  // Only eSewa is enabled for now; KHALTI is accepted then coerced server-side.
+  provider: z.enum(["ESEWA", "KHALTI"]).default("ESEWA"),
 });
 
 export const verifyPaymentSchema = z.object({

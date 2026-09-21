@@ -132,9 +132,12 @@ export async function bookAppointment(
     });
 
     return {
-      ...result,
-      paymentRequired: hospital.paymentRequired,
+      ...result.appointment,
+      payment: result.payment,
+      payments: result.payment ? [result.payment] : [],
+      paymentRequired: needsPayment,
       needsPayment,
+      consultationFee: doctor.consultationFee,
     };
   } catch (error) {
     if (isUniqueConflict(error)) {
