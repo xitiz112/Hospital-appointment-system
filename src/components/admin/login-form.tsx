@@ -116,6 +116,12 @@ export function LoginForm() {
           {pending ? "Signing in…" : "Continue to dashboard"}
         </Button>
       </form>
+      <p className="mt-8 text-sm text-[#5c635c]">
+        Booking as a patient?{" "}
+        <a href="/portal/login" className="font-semibold text-[#1f3d32] underline-offset-4 hover:underline">
+          Go to the patient portal
+        </a>
+      </p>
     </div>
   );
 }

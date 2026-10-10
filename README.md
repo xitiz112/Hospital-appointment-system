@@ -32,6 +32,8 @@ If Docker is not installed, create a local Postgres database that matches `DATAB
 
 Admin dashboard: [http://localhost:3000/login](http://localhost:3000/login)
 
+Patient portal: [http://localhost:3000/portal](http://localhost:3000/portal) — register, sign in, find doctors, book slots, pay with eSewa, reschedule/cancel, receipts, notifications, and profile. It is a client of `/api/v1` using the same Bearer access/refresh tokens as the mobile app (stored in `localStorage`, refreshed automatically). eSewa/Khalti return routes redirect to `/portal/payments/result`.
+
 ## Seed logins
 
 All seeded passwords are `Password123!`

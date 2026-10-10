@@ -188,10 +188,14 @@ export const adminUserCreateSchema = z.object({
   email: z.email(),
   phone: z.string().trim().min(7).max(20).optional(),
   password: z.string().min(8),
-  role: z.enum(["ADMIN"]),
+  // Doctors need a department and fee, so they are created via POST /api/v1/doctors.
+  role: z.enum(["ADMIN", "PATIENT"]),
 });
 
 export const adminUserPatchSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
   name: z.string().trim().min(2).optional(),
+  email: z.email().optional(),
+  phone: z.string().trim().min(7).max(20).optional().nullable(),
+  password: z.string().min(8, "Password must be at least 8 characters").optional(),
 });

@@ -22,5 +22,9 @@ export async function GET(req: NextRequest) {
   }).catch((e) => ({ error: String(e) }));
   const app = process.env.APP_URL ?? "http://localhost:3000";
   const ok = "verified" in result && result.verified;
-  return NextResponse.redirect(`${app}/payments?esewa=${ok ? "success" : "failed"}`);
+  const target = new URL("/portal/payments/result", app);
+  target.searchParams.set("provider", "esewa");
+  target.searchParams.set("status", ok ? "success" : "failed");
+  if ("payment" in result) target.searchParams.set("appointmentId", result.payment.appointmentId);
+  return NextResponse.redirect(target);
 }

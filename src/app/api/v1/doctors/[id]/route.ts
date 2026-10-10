@@ -5,6 +5,7 @@ import { doctorUpdateSchema } from "@/lib/validators";
 import { doctorPublicSelect } from "@/lib/slots";
 import { writeAudit } from "@/lib/audit";
 import { notifyUser } from "@/lib/notifications";
+import { hashPassword } from "@/lib/password";
 
 export const GET = apiHandler(async ({ params }) => {
   const doctor = await prisma.doctor.findUnique({
@@ -26,13 +27,25 @@ export const PATCH = apiHandler(async ({ req, params, user }) => {
   if (user.role !== Role.ADMIN && !isOwn) {
     throw new ApiError("FORBIDDEN", "You cannot update this doctor", 403);
   }
-  const body = doctorUpdateSchema.parse(await readJson(req));
+  const { password, ...body } = doctorUpdateSchema.parse(await readJson(req));
 
   if (user.role === Role.ADMIN && (body.name || body.phone)) {
     await prisma.user.update({
       where: { id: existing.userId },
       data: { name: body.name, phone: body.phone },
     });
+  }
+
+  // Only admins set a doctor's password here; it signs the doctor out of every device.
+  if (user.role === Role.ADMIN && password) {
+    const passwordHash = await hashPassword(password);
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: existing.userId }, data: { passwordHash } }),
+      prisma.refreshToken.updateMany({
+        where: { userId: existing.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
   }
 
   const doctor = await prisma.doctor.update({
@@ -66,7 +79,7 @@ export const PATCH = apiHandler(async ({ req, params, user }) => {
     action: "DOCTOR_UPDATED",
     entity: "Doctor",
     entityId: doctor.id,
-    payload: body,
+    payload: { ...body, passwordChanged: user.role === Role.ADMIN && Boolean(password) },
   });
   return jsonOk(doctor);
 }, { auth: true, roles: [Role.ADMIN, Role.DOCTOR] });
