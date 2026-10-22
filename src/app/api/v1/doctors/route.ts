@@ -13,8 +13,12 @@ export const GET = apiHandler(async ({ req }) => {
   const departmentId = url.searchParams.get("departmentId") ?? undefined;
   const specializationId = url.searchParams.get("specializationId") ?? undefined;
   const available = url.searchParams.get("available");
-  const minFee = url.searchParams.get("minFee");
-  const maxFee = url.searchParams.get("maxFee");
+  const feeParam = (name: string) => {
+    const raw = url.searchParams.get(name);
+    return raw && Number.isFinite(Number(raw)) ? raw : null;
+  };
+  const minFee = feeParam("minFee");
+  const maxFee = feeParam("maxFee");
   const sort = url.searchParams.get("sort") ?? "name";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
   const pageSize = Math.min(50, Math.max(1, Number(url.searchParams.get("pageSize") ?? 20)));
@@ -50,7 +54,7 @@ export const GET = apiHandler(async ({ req }) => {
           ? { experienceYears: "desc" }
           : { user: { name: "asc" } };
 
-  const [total, items] = await prisma.$transaction([
+  const [total, items] = await Promise.all([
     prisma.doctor.count({ where }),
     prisma.doctor.findMany({
       where,

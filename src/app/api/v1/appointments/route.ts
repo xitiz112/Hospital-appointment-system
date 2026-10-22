@@ -15,7 +15,7 @@ export const GET = apiHandler(async ({ req, user }) => {
     ...scopedAppointmentWhere(user),
     ...(status ? { status: status as never } : {}),
   };
-  const [total, items] = await prisma.$transaction([
+  const [total, items] = await Promise.all([
     prisma.appointment.count({ where }),
     prisma.appointment.findMany({
       where,

@@ -42,27 +42,30 @@ export async function generateSlots(doctorId: string, dateStr: string, tz = HOSP
   const weekday = weekdayInZone(fromZonedTime(`${date}T12:00:00`, tz), tz);
   const { start: dayStart, end: dayEnd } = dayRangeUtc(date, tz);
 
-  const doctor = await prisma.doctor.findUnique({
-    where: { id: doctorId },
-    include: {
-      schedules: { where: { weekday } },
-      breaks: { where: { weekday } },
-      unavailability: {
-        where: { startAt: { lt: dayEnd }, endAt: { gt: dayStart } },
+  // Independent lookups run in parallel; each is a round trip to the remote database.
+  const [doctor, booked] = await Promise.all([
+    prisma.doctor.findUnique({
+      where: { id: doctorId },
+      include: {
+        schedules: { where: { weekday } },
+        breaks: { where: { weekday } },
+        unavailability: {
+          where: { startAt: { lt: dayEnd }, endAt: { gt: dayStart } },
+        },
       },
-    },
-  });
+    }),
+    prisma.appointment.findMany({
+      where: {
+        doctorId,
+        startAt: { gte: dayStart, lte: dayEnd },
+        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.RESCHEDULED] },
+      },
+      select: { startAt: true, endAt: true },
+    }),
+  ]);
   if (!doctor) return [];
 
   const duration = doctor.appointmentDurationMin;
-  const booked = await prisma.appointment.findMany({
-    where: {
-      doctorId,
-      startAt: { gte: dayStart, lte: dayEnd },
-      status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.RESCHEDULED] },
-    },
-    select: { startAt: true, endAt: true },
-  });
 
   const now = new Date();
   const slots: GeneratedSlot[] = [];

@@ -71,14 +71,14 @@ export default async function AppointmentsPage({
         </Button>
       </div>
       <form className="flex flex-wrap gap-2">
-        <select name="status" defaultValue={q.status ?? "ALL"} className="h-9 rounded-md border px-3 text-sm">
+        <select name="status" aria-label="Filter by status" defaultValue={q.status ?? "ALL"} className="h-9 rounded-md border px-3 text-sm">
           {STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
         </select>
-        <select name="doctorId" defaultValue={q.doctorId ?? ""} className="h-9 rounded-md border px-3 text-sm">
+        <select name="doctorId" aria-label="Filter by doctor" defaultValue={q.doctorId ?? ""} className="h-9 rounded-md border px-3 text-sm">
           <option value="">All doctors</option>
           {doctors.map((d) => (
             <option key={d.id} value={d.id}>
@@ -86,7 +86,7 @@ export default async function AppointmentsPage({
             </option>
           ))}
         </select>
-        <select name="patientId" defaultValue={q.patientId ?? ""} className="h-9 rounded-md border px-3 text-sm">
+        <select name="patientId" aria-label="Filter by patient" defaultValue={q.patientId ?? ""} className="h-9 rounded-md border px-3 text-sm">
           <option value="">All patients</option>
           {patients.map((p) => (
             <option key={p.id} value={p.id}>

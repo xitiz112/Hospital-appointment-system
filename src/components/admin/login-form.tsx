@@ -12,8 +12,8 @@ export function LoginForm() {
   const params = useSearchParams();
   const sessionExpired = params.get("reason") === "session_expired";
   const authRequired = params.get("reason") === "auth_required";
-  const [email, setEmail] = useState("admin@hospital.local");
-  const [password, setPassword] = useState("Password123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -31,6 +31,10 @@ export function LoginForm() {
       callbackUrl: nextPath,
     });
     setPending(false);
+    if (res?.code === "too_many_attempts") {
+      setError("Too many failed attempts. Try again in 15 minutes.");
+      return;
+    }
     if (res?.error || !res?.ok) {
       setError("Invalid admin credentials.");
       return;

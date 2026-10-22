@@ -74,12 +74,16 @@ export function PatientForm({
           <Label>Phone</Label>
           <Input name="phone" defaultValue={patient?.phone ?? ""} />
         </div>
-        {!isEdit ? (
-          <div className="space-y-1">
-            <Label>Password</Label>
-            <Input name="password" type="password" placeholder="Defaults to Password123!" />
-          </div>
-        ) : null}
+        <div className="space-y-1">
+          <Label>{isEdit ? "New password" : "Password"}</Label>
+          <Input
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            minLength={8}
+            placeholder={isEdit ? "Leave blank to keep current" : "Defaults to Password123!"}
+          />
+        </div>
         <div className="space-y-1">
           <Label>Date of birth</Label>
           <Input name="dateOfBirth" type="date" defaultValue={patient?.dateOfBirth ?? ""} />

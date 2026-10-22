@@ -14,7 +14,11 @@
     "prisma:seed": "prisma db seed",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test": "vitest run",
+    "test:integration": "vitest run -c vitest.integration.config.mts",
+    "test:e2e": "vitest run -c vitest.e2e.config.mts",
+    "test:perf": "node tests/performance/load.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -35,14 +39,14 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
-    "docker": "^1.0.0",
     "jose": "^6.2.12",
     "lucide-react": "^1.44.0",
-    "next": "16.3.4",
+    "next": "^16.4.2",
     "next-auth": "^5.0.0-beta.32",
-    "nodemailer": "^8.0.11",
+    "nodemailer": "^10.2.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "recharts": "^3.10.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.6.1"
   },
@@ -53,11 +57,19 @@
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autocannon": "^8.0.0",
+    "axe-core": "^4.14.0",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "^16.4.2",
     "prisma": "^6.19.3",
+    "puppeteer-core": "^23.11.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
+  },
+  "overrides": {
+    "nodemailer": "$nodemailer",
+    "source-map-js": "^1.2.2"
   }
 }

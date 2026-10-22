@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { Role, UserStatus } from "@prisma/client";
+import { Prisma, Role, UserStatus } from "@prisma/client";
 import { getCurrentUser, type CurrentUser } from "@/lib/auth";
 import { toJsonValue } from "@/lib/serialize";
 import { ApiError } from "@/lib/errors";
@@ -103,12 +103,12 @@ export function apiHandler<P extends Record<string, string> = Record<string, str
         const message = error.issues.map((i) => i.message).join("; ") || "Invalid input";
         return withCors(jsonError("VALIDATION_ERROR", message, 400, error.issues), req);
       }
+      if (error instanceof Prisma.PrismaClientValidationError) {
+        return withCors(jsonError("VALIDATION_ERROR", "Invalid request parameters", 400), req);
+      }
+      // Log details server-side only; they include file paths and query internals.
       console.error(error);
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : "Something went wrong";
-      return withCors(jsonError("INTERNAL_ERROR", message, 500), req);
+      return withCors(jsonError("INTERNAL_ERROR", "Something went wrong. Please try again.", 500), req);
     }
   };
 }

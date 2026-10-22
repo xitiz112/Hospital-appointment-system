@@ -42,7 +42,8 @@ export async function initiatePayment(
     include: { patient: true, doctor: { include: { user: true } }, payments: true },
   });
   if (!appointment) throw new ApiError("NOT_FOUND", "Appointment not found", 404);
-  if (user.role === Role.PATIENT && user.patient?.id !== appointment.patientId) {
+  const ownsAppointment = user.role === Role.PATIENT && user.patient?.id === appointment.patientId;
+  if (user.role !== Role.ADMIN && !ownsAppointment) {
     throw new ApiError("FORBIDDEN", "You can only pay for your own appointments", 403);
   }
   if (appointment.status === AppointmentStatus.CANCELLED) {
@@ -160,6 +161,9 @@ export async function verifyPayment(input: {
     orderBy: { createdAt: "desc" },
   });
   if (!payment) throw new ApiError("NOT_FOUND", "Payment not found", 404);
+  if (payment.status === PaymentStatus.SUCCESS) {
+    return { payment, verified: true };
+  }
 
   const amount = Number(payment.amount).toFixed(2);
   const result = await providerFor(input.provider).verify({
@@ -169,6 +173,11 @@ export async function verifyPayment(input: {
   });
 
   if (!result.ok) {
+    // Only a gateway attempt that is in progress can be marked failed; pending, refunded
+    // or cash records are left alone so a stray verify call cannot change them.
+    if (payment.status !== PaymentStatus.INITIATED) {
+      return { payment, verified: false };
+    }
     await prisma.payment.update({
       where: { id: payment.id },
       data: { status: PaymentStatus.FAILED, metadata: result.raw as Prisma.InputJsonValue },

@@ -58,7 +58,7 @@ export const GET = apiHandler(async ({ user }) => {
     feesPending,
     weekAppointments,
     schedules,
-  ] = await prisma.$transaction([
+  ] = await Promise.all([
     prisma.appointment.findMany({
       where: {
         doctorId,

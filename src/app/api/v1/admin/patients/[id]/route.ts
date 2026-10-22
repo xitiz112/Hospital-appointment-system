@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ApiError, apiHandler, jsonOk, readJson } from "@/lib/api";
 import { adminPatientUpdateSchema } from "@/lib/validators";
 import { writeAudit } from "@/lib/audit";
+import { hashPassword } from "@/lib/password";
 
 export const GET = apiHandler(async ({ params }) => {
   const patient = await prisma.patient.findUnique({
@@ -21,9 +22,21 @@ export const GET = apiHandler(async ({ params }) => {
 }, { auth: true, roles: [Role.ADMIN] });
 
 export const PATCH = apiHandler(async ({ req, params, user }) => {
-  const body = adminPatientUpdateSchema.parse(await readJson(req));
+  const { password, ...body } = adminPatientUpdateSchema.parse(await readJson(req));
   const patient = await prisma.patient.findUnique({ where: { id: params.id } });
   if (!patient) throw new ApiError("NOT_FOUND", "Patient not found", 404);
+
+  // Setting a new password signs the patient out of every device.
+  if (password) {
+    const passwordHash = await hashPassword(password);
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: patient.userId }, data: { passwordHash } }),
+      prisma.refreshToken.updateMany({
+        where: { userId: patient.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+  }
 
   const updated = await prisma.patient.update({
     where: { id: params.id },
@@ -50,7 +63,7 @@ export const PATCH = apiHandler(async ({ req, params, user }) => {
     action: "PATIENT_UPDATED",
     entity: "Patient",
     entityId: patient.id,
-    payload: body,
+    payload: { ...body, passwordChanged: Boolean(password) },
   });
   return jsonOk(updated);
 }, { auth: true, roles: [Role.ADMIN] });

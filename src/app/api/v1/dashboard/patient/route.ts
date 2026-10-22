@@ -5,7 +5,7 @@ import { ApiError, apiHandler, jsonOk } from "@/lib/api";
 export const GET = apiHandler(async ({ user }) => {
   if (!user?.patient) throw new ApiError("FORBIDDEN", "Patient profile required", 403);
   const now = new Date();
-  const [upcoming, past, unread] = await prisma.$transaction([
+  const [upcoming, past, unread] = await Promise.all([
     prisma.appointment.findMany({
       where: {
         patientId: user.patient.id,

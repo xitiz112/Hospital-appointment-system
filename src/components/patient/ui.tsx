@@ -81,6 +81,9 @@ export function Avatar({ name, src, className }: { name: string; src?: string | 
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase() ?? "")
     .join("");
+  // Fall back to initials when the image fails to load (e.g. missing blob/upload).
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const showImage = Boolean(src) && failedSrc !== src;
   return (
     <div
       className={cn(
@@ -88,9 +91,9 @@ export function Avatar({ name, src, className }: { name: string; src?: string | 
         className,
       )}
     >
-      {src ? (
+      {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className="h-full w-full object-cover" />
+        <img src={src!} alt="" className="h-full w-full object-cover" onError={() => setFailedSrc(src ?? null)} />
       ) : (
         initials
       )}

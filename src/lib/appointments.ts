@@ -74,39 +74,36 @@ export async function bookAppointment(
 
   const needsPayment = requiresSuccessfulPayment(hospital.paymentRequired, doctor.consultationFee);
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const appointment = await tx.appointment.create({
-        data: {
-          hospitalId: hospital.id,
-          patientId,
-          doctorId: doctor.id,
-          startAt: check.slot!.startAt,
-          endAt: check.slot!.endAt,
-          status: needsPayment ? AppointmentStatus.PENDING : AppointmentStatus.CONFIRMED,
-          notes: input.notes,
-        },
-        include: {
-          doctor: { include: { user: true, department: true, specialization: true } },
-          patient: { include: { user: true } },
-          hospital: true,
-        },
-      });
-
-      let payment = null;
-      if (needsPayment) {
-        payment = await tx.payment.create({
-          data: {
-            appointmentId: appointment.id,
-            amount: doctor.consultationFee,
-            currency: "NPR",
-            provider: PaymentProviderType.CASH,
-            status: PaymentStatus.PENDING,
-          },
-        });
-      }
-
-      return { appointment, payment };
+    // Nested write: Prisma creates the appointment and payment atomically in one call,
+    // avoiding an interactive transaction that times out against a remote database.
+    const { payments, ...appointment } = await prisma.appointment.create({
+      data: {
+        hospitalId: hospital.id,
+        patientId,
+        doctorId: doctor.id,
+        startAt: check.slot!.startAt,
+        endAt: check.slot!.endAt,
+        status: needsPayment ? AppointmentStatus.PENDING : AppointmentStatus.CONFIRMED,
+        notes: input.notes,
+        payments: needsPayment
+          ? {
+              create: {
+                amount: doctor.consultationFee,
+                currency: "NPR",
+                provider: PaymentProviderType.CASH,
+                status: PaymentStatus.PENDING,
+              },
+            }
+          : undefined,
+      },
+      include: {
+        doctor: { include: { user: true, department: true, specialization: true } },
+        patient: { include: { user: true } },
+        hospital: true,
+        payments: true,
+      },
     });
+    const result = { appointment, payment: payments[0] ?? null };
 
     await writeAudit({
       actorId: user.id,

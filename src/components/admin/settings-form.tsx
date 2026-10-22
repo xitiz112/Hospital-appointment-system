@@ -47,32 +47,33 @@ export function SettingsForm(props: {
   return (
     <form onSubmit={onSubmit} className="grid max-w-xl gap-4">
       <div className="space-y-1">
-        <Label>Hospital name</Label>
-        <Input name="name" defaultValue={props.name} required />
+        <Label htmlFor="settings-name">Hospital name</Label>
+        <Input id="settings-name" name="name" defaultValue={props.name} required />
       </div>
       <div className="space-y-1">
-        <Label>Email</Label>
-        <Input name="email" defaultValue={props.email} />
+        <Label htmlFor="settings-email">Email</Label>
+        <Input id="settings-email" name="email" defaultValue={props.email} />
       </div>
       <div className="space-y-1">
-        <Label>Phone</Label>
-        <Input name="phone" defaultValue={props.phone} />
+        <Label htmlFor="settings-phone">Phone</Label>
+        <Input id="settings-phone" name="phone" defaultValue={props.phone} />
       </div>
       <div className="space-y-1">
-        <Label>Address</Label>
-        <Input name="address" defaultValue={props.address} />
+        <Label htmlFor="settings-address">Address</Label>
+        <Input id="settings-address" name="address" defaultValue={props.address} />
       </div>
       <div className="space-y-1">
-        <Label>Timezone</Label>
-        <Input name="timezone" defaultValue={props.timezone} />
+        <Label htmlFor="settings-timezone">Timezone</Label>
+        <Input id="settings-timezone" name="timezone" defaultValue={props.timezone} />
       </div>
       <div className="space-y-1">
-        <Label>Cancellation window (hours)</Label>
-        <Input name="cancellationHours" type="number" defaultValue={props.cancellationHours} />
+        <Label htmlFor="settings-cancellationHours">Cancellation window (hours)</Label>
+        <Input id="settings-cancellationHours" name="cancellationHours" type="number" defaultValue={props.cancellationHours} />
       </div>
       <div className="space-y-1">
-        <Label>Default appointment duration (min)</Label>
+        <Label htmlFor="settings-defaultAppointmentDurationMin">Default appointment duration (min)</Label>
         <Input
+          id="settings-defaultAppointmentDurationMin"
           name="defaultAppointmentDurationMin"
           type="number"
           defaultValue={props.defaultAppointmentDurationMin}

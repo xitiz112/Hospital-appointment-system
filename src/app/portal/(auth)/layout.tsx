@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 const steps = [
   { index: "01", title: "Find a doctor", copy: "Search by department, specialty, fee, or name." },
   { index: "02", title: "Pick a time", copy: "Live open slots in Nepal time — no phone queue." },
@@ -22,7 +20,7 @@ export default function PatientAuthLayout({ children }: { children: React.ReactN
       <div className="clinic-grid pointer-events-none absolute inset-0" />
 
       <div className="relative mx-auto grid min-h-screen max-w-[1280px] lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)]">
-        <section className="order-2 flex flex-col px-6 py-8 sm:px-10 lg:order-1 lg:h-full lg:justify-between lg:px-14 lg:py-14">
+        <section className="order-2 flex flex-col px-6 py-8 sm:px-10 lg:order-1 lg:h-full lg:px-14 lg:py-14">
           <header className="flex items-center gap-3">
             <ClinicMark className="h-9 w-9 text-[#1f3d32]" />
             <div>
@@ -31,7 +29,7 @@ export default function PatientAuthLayout({ children }: { children: React.ReactN
             </div>
           </header>
 
-          <div className="mt-14 max-w-xl space-y-7 lg:mt-0">
+          <div className="mt-14 max-w-xl space-y-7 lg:my-auto">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#8a6a3d]">
               Patient access
             </p>
@@ -55,13 +53,6 @@ export default function PatientAuthLayout({ children }: { children: React.ReactN
               ))}
             </ol>
           </div>
-
-          <p className="mt-12 text-xs text-[#6a6256]">
-            Hospital staff?{" "}
-            <Link href="/login" className="font-semibold text-[#1f3d32] underline-offset-4 hover:underline">
-              Sign in to the admin dashboard
-            </Link>
-          </p>
         </section>
 
         <section className="relative order-1 flex items-center border-b border-[#d8cfc0] bg-[#fbf8f2] px-6 py-10 sm:px-10 lg:order-2 lg:border-b-0 lg:border-l lg:px-12">

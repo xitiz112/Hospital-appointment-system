@@ -32,7 +32,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/users">) {
       : {}),
   };
 
-  const [total, users] = await prisma.$transaction([
+  const [total, users] = await Promise.all([
     prisma.user.count({ where }),
     prisma.user.findMany({
       where,

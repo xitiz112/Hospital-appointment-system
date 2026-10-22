@@ -22,6 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { formatKtm, statusVariant } from "@/lib/format";
 import { HOSPITAL_TZ } from "@/lib/serialize";
 import { cn } from "@/lib/utils";
+import { getDashboardInsights } from "@/lib/dashboard-insights";
+import { BarList, RevenueByMonthChart, VisitsByDayChart } from "@/components/admin/dashboard-charts";
 
 const featuredMeta = [
   {
@@ -48,11 +50,11 @@ const compactMeta = [
 
 const toneClass = {
   forest: "bg-[#1B4F72] text-white border-transparent",
-  sand: "bg-[#2E86AB] text-white border-transparent",
+  sand: "bg-[#1F6F91] text-white border-transparent",
   paper: "bg-[#FFFFFF] text-[#1A2332] border-[#D0DCE8]",
   ink: "bg-[#1A2332] text-[#F5F8FB] border-transparent",
   quiet: "bg-[#E8F1F8] text-[#1A2332] border-transparent",
-  ochre: "bg-[#C48A00] text-white border-transparent",
+  ochre: "bg-[#8A6100] text-white border-transparent",
   line: "bg-transparent text-[#1A2332] border-[#1B4F72]",
 };
 
@@ -86,6 +88,7 @@ export default async function DashboardPage() {
     pendingPayments,
     todayList,
     recent,
+    insights,
   ] = await Promise.all([
     getHospitalCached(),
     prisma.patient.count({ where: { user: { status: UserStatus.ACTIVE } } }),
@@ -124,6 +127,7 @@ export default async function DashboardPage() {
       take: 8,
       select: apptListSelect,
     }),
+    getDashboardInsights(now),
   ]);
 
   const featuredValues = [todayAppointments, upcoming];
@@ -144,7 +148,7 @@ export default async function DashboardPage() {
         <div className="clinic-grid pointer-events-none absolute inset-0 opacity-70" />
         <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-xl space-y-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#2E86AB]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#1F6F91]">
               {todayLabel}
             </p>
             <h1 className="text-3xl font-semibold tracking-tight text-[#1A2332] sm:text-4xl">
@@ -175,19 +179,23 @@ export default async function DashboardPage() {
               <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5A6B7D]">
                 On the board
               </dt>
-              <dd className="mt-1 text-4xl font-semibold tracking-tight text-[#1B4F72]">
-                {todayAppointments}
+              <dd className="mt-1">
+                <span className="block text-4xl font-semibold tracking-tight text-[#1B4F72]">
+                  {todayAppointments}
+                </span>
+                <span className="mt-1 block text-xs text-[#5A6B7D]">visits today</span>
               </dd>
-              <p className="mt-1 text-xs text-[#5A6B7D]">visits today</p>
             </div>
             <div>
               <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5A6B7D]">
                 Ledger
               </dt>
-              <dd className="mt-1 text-4xl font-semibold tracking-tight text-[#1A2332]">
-                {pendingPayments}
+              <dd className="mt-1">
+                <span className="block text-4xl font-semibold tracking-tight text-[#1A2332]">
+                  {pendingPayments}
+                </span>
+                <span className="mt-1 block text-xs text-[#5A6B7D]">pending payments</span>
               </dd>
-              <p className="mt-1 text-xs text-[#5A6B7D]">pending payments</p>
             </div>
           </dl>
         </div>
@@ -205,7 +213,7 @@ export default async function DashboardPage() {
                 )}
               >
                 <div>
-                  <p className="text-sm/6 opacity-80">{stat.label}</p>
+                  <p className="text-sm/6 opacity-90">{stat.label}</p>
                   <p className="mt-2 text-4xl font-semibold tracking-tight">{featuredValues[index]}</p>
                 </div>
                 <Icon className="h-6 w-6 opacity-70" />
@@ -228,11 +236,42 @@ export default async function DashboardPage() {
               >
                 <Icon className="mb-5 h-4 w-4 opacity-70" />
                 <p className="text-2xl font-semibold tracking-tight">{compactValues[index]}</p>
-                <p className="mt-1 text-xs leading-5 opacity-80">{stat.label}</p>
+                <p className="mt-1 text-xs leading-5 opacity-90">{stat.label}</p>
               </article>
             </Link>
           );
         })}
+      </section>
+
+      <section className="space-y-6" aria-labelledby="insights-heading">
+        <div>
+          <h2 id="insights-heading" className="text-lg font-semibold tracking-tight">
+            Insights
+          </h2>
+          <p className="text-sm text-[#5A6B7D]">How visits, revenue, and workload are trending.</p>
+        </div>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <ChartCard title="Visits by day" subtitle="Last 30 days and the next 7 (excludes cancelled)">
+            <VisitsByDayChart data={insights.visitsByDay} />
+          </ChartCard>
+          <ChartCard title="Revenue by month" subtitle="Successful payments, NPR">
+            <RevenueByMonthChart data={insights.revenueByMonth} />
+          </ChartCard>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <ChartCard title="Appointment status" subtitle="All appointments">
+            <BarList items={insights.byStatus} />
+          </ChartCard>
+          <ChartCard title="Visits by department" subtitle="Excludes cancelled">
+            <BarList items={insights.byDepartment} />
+          </ChartCard>
+          <ChartCard title="Busiest doctors" subtitle="Top 6 by visits">
+            <BarList items={insights.topDoctors} />
+          </ChartCard>
+          <ChartCard title="Revenue by method" subtitle="Last 6 months, NPR">
+            <BarList items={insights.byPaymentMethod} empty="No payments yet" />
+          </ChartCard>
+        </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
@@ -268,7 +307,7 @@ export default async function DashboardPage() {
               {todayList.map((a, i) => (
                 <li key={a.id} className="relative grid grid-cols-[3.25rem_1fr] gap-3">
                   <div className="relative flex flex-col items-end pt-3">
-                    <time className="text-xs font-semibold tabular-nums text-[#2E86AB]">
+                    <time className="text-xs font-semibold tabular-nums text-[#1F6F91]">
                       {formatKtm(a.startAt, "HH:mm")}
                     </time>
                     {i < todayList.length - 1 ? (
@@ -344,5 +383,25 @@ export default async function DashboardPage() {
         </article>
       </section>
     </div>
+  );
+}
+
+function ChartCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <article className="min-w-0 rounded-2xl border border-[#D0DCE8] bg-[#FFFFFF] p-6">
+      <div className="mb-5">
+        <h3 className="text-base font-semibold tracking-tight text-[#1A2332]">{title}</h3>
+        <p className="text-sm text-[#5A6B7D]">{subtitle}</p>
+      </div>
+      {children}
+    </article>
   );
 }

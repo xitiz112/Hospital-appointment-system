@@ -16,7 +16,7 @@ export const GET = apiHandler(async () => {
     cancelled,
     revenue,
     pendingPayments,
-  ] = await prisma.$transaction([
+  ] = await Promise.all([
     prisma.patient.count({ where: { user: { status: UserStatus.ACTIVE } } }),
     prisma.doctor.count({ where: { user: { status: UserStatus.ACTIVE } } }),
     prisma.appointment.count({

@@ -174,6 +174,7 @@ export const adminPatientCreateSchema = z.object({
 
 export const adminPatientUpdateSchema = z.object({
   name: z.string().trim().min(2).optional(),
+  password: z.string().min(8, "Password must be at least 8 characters").optional(),
   phone: z.string().trim().min(7).max(20).optional().nullable(),
   dateOfBirth: z.string().optional().nullable(),
   gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional().nullable(),
